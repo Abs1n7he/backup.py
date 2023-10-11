@@ -24,12 +24,20 @@ def dirCompare(raw_root,backup_root):
  
     setA = set(raw_files)
     setB = set(backup_files)
- 
     commonfiles = setA & setB
 
+ 
+    updatefiles=[] 
     for of in sorted(commonfiles):
         if os.stat(raw_root+'\\'+of).st_mtime != os.stat(backup_root+'\\'+of).st_mtime:
+            updatefiles.append(of)
+
+    if len(updatefiles) > 0:
+        print('\033[1;32m--------------------- update ---------------------\033[0m')
+        for of in updatefiles:
+            print('\033[1;32m%s\033[0m' % (backup_root + of))
             shutil.copy2(raw_root + of, backup_root + of)
+
  
     
     onlyFiles = setA ^ setB
@@ -48,7 +56,7 @@ def dirCompare(raw_root,backup_root):
             print('\033[1;32m%s\033[0m' % (backup_root + of))
             if not os.path.exists(os.path.dirname(backup_root + of)):
                 os.makedirs(os.path.dirname(backup_root + of))
-            shutil.copy2(raw_root + of, backup_root + of)
+            shutil.copy2(raw_root + of, backup_root + of)#复制
 
             
     if len(onlyIn_backup) > 0:

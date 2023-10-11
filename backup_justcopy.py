@@ -1,5 +1,6 @@
 import os
 import shutil
+import stat
 from colorama import init
 init(autoreset=True)
 
@@ -26,8 +27,15 @@ def dirCompare(raw_root,backup_root):
  
     commonfiles = setA & setB
 
+    updatefiles=[] 
     for of in sorted(commonfiles):
         if os.stat(raw_root+'\\'+of).st_mtime != os.stat(backup_root+'\\'+of).st_mtime:
+            updatefiles.append(of)
+
+    if len(updatefiles) > 0:
+        print('\033[1;32m--------------------- update ---------------------\033[0m')
+        for of in updatefiles:
+            print('\033[1;32m%s\033[0m' % (backup_root + of))
             shutil.copy2(raw_root + of, backup_root + of)
  
     
