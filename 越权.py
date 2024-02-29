@@ -66,15 +66,41 @@ def GetResponse(http,method,path,host,dict_headers,isjson,body):  #http为'http'
         return False
     return url,res
 
-class Example(QWidget):
+class Example(QMainWindow):
     def __init__(self):
         super().__init__()
+        # 获取菜单栏
         self.initUI()
+        self.menu()
+        self.showStatus('黑盒越权测试 Bate 1.1   By:Abs1nThe')
+        self.show()
+
+
+    def showStatus(self,txt):
+        ############## 状态栏显示 ##############
+        self.status = self.statusBar()
+        self.status.showMessage(txt, 5000)  # 状态栏显示 文本 5秒
+
+    def menu(self):
+        ############## 菜单栏 ##############
+        bar = self.menuBar()
+        # 往菜单栏添加菜单项目
+        file = bar.addMenu("文件")
+        # 给菜单项目添加子菜单
+        new = file.addAction("新建")
+        save = file.addAction("保存")
+        save.setShortcut("CTRL+S")  # 设置快捷键
+        save.triggered.connect(self.saveActionSlot)
+
+    def saveActionSlot(self):
+        print(self.sender().text())
 
     def initUI(self):
         self.setWindowIcon(QIcon('logo.ico'))
         self.resize(int(app.desktop().width() * 0.9), int(app.desktop().height() * 0.8))
-        self.setWindowTitle('黑盒越权测试 Bate   By:Abs1nThe')
+        self.setWindowTitle('黑盒越权测试 Bate 1.1   By:Abs1nThe')
+
+
 
         ############## 1 ##############
         grid = QGridLayout(self)
@@ -151,7 +177,6 @@ class Example(QWidget):
             self.check_res_header.setText(json_to_str(json.loads(check_res_header1)).strip())
         except:
             pass
-
         grid.addWidget(self.response, 1, 4, 5, 1)
         grid.addWidget(self.check_res_header_button, 6, 4)
         grid.addWidget(self.check_res_header, 7, 4)
@@ -168,7 +193,11 @@ class Example(QWidget):
         self.delete_req_header.setAcceptRichText(False)
         self.requests1.setAcceptRichText(False)
 
-        self.show()
+        ############## 创建主界面窗口并设置为中心窗口 ##############
+        mainwidget = QWidget()
+        mainwidget.setLayout(grid)
+        self.setCentralWidget(mainwidget)
+
 
     def runReq(self,session):
         ############## 设置代理 ##############
