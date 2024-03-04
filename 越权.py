@@ -16,6 +16,14 @@ from PyQt5.QtCore import Qt, pyqtSlot, QMetaObject
 proxies={}
 def ecd(str):
     return str.replace('<','&lt;').replace('>','&gt;')
+def jsonXmlBody(headers,body):
+    if 'Content-Type' in headers.keys():
+        if 'json' in headers['Content-Type'] and body.startswith('{'):
+            return json.dumps(json.loads(body), indent=4, ensure_ascii=False, sort_keys=False,separators=(',', ';'))
+        elif 'xml' in headers['Content-Type'] and body.startswith('<'):
+            return printXML(body).replace('ns0:','')
+    else:
+        return '<br>'+ecd(body)
 def str_to_json(str):
     dict={}
     for i in str.split('\n'):
@@ -41,7 +49,7 @@ def GetRequest(req): #从字符串获取请求内容
     headers=req.partition('\n')[2].partition('\n')[2].partition('\n\n')[0].strip()
     dict_headers = str_to_json(headers)
     body = req.partition('\n\n')[2]
-    if 'Content-Type' in dict_headers.keys() and 'json' in dict_headers['Content-Type'] and body[0] == '{':
+    if 'Content-Type' in dict_headers.keys() and 'json' in dict_headers['Content-Type'] and body.strip().startswith('{'):
         isjson=True
         body = json.loads(body)
     else:
@@ -146,7 +154,7 @@ class Example(QMainWindow):
             temp=[]
             for line in f:
                 if line.startswith(key):
-                    temp.append('Log='+value+'\n')
+                    temp.append(key+value+'\n')
                 else:
                     temp.append(line)
             f.close()
@@ -340,7 +348,7 @@ class Example(QMainWindow):
 
         ############## 删除长度，替换session ##############
         try:
-            dict_headers.pop('Content-length')
+            del dict_headers['Content-length']
         except:
             pass
         for key, value in str_to_json(session).items():
@@ -355,7 +363,7 @@ class Example(QMainWindow):
                     pass
 
         # 置空
-        self.response.setText('')
+        self.response.clear()
         self.status.showMessage('Loading...', 5000)
         ############## 发送请求 ##############
         try:
@@ -365,6 +373,8 @@ class Example(QMainWindow):
             self.status.showMessage('Error 请求失败,检查host,http', 5000)
             return
 
+        req_1=req.partition(headers)[0]
+        req_2=req.partition(headers)[2]
         ############## 记录日志 ##############html
         if self.LogSwitch == 'True':
             if not os.path.isfile(self.logFile):
@@ -374,9 +384,8 @@ class Example(QMainWindow):
             with open(self.logFile, 'a', encoding='utf-8') as log:
                 log.write(time.strftime("<details><summary>[%Y/%m/%d %H:%M:%S] ",
                                         time.localtime(time.time())) + url + "</summary>" +
-                          "<div class=\"div1\"><p>" + req.partition(headers)[0].replace('\n', '<br>') + ''.join(
-                    [key + ': ' + value + '<br>' for key, value in dict_headers.items()]) + req.partition(headers)[
-                              2].replace('\n', '<br>') + "</p><br>")
+                          "<div class=\"div1\"><p>" + req_1.replace('\n', '<br>') +
+                          ''.join([key + ': ' + value + '<br>' for key, value in dict_headers.items()]) + req_2.replace('\n', '<br>') + "</p><br>")
                 log.write('<p>[response:]<br>' + str(res.status_code) + " " + res.reason + "<br>" +
                           ''.join([k + ':' + v + '<br>' for k, v in res.headers.items()]) + "<br>" +
                           res.text + "</p></div></details>")
@@ -406,14 +415,16 @@ class Example(QMainWindow):
         self.response.setText(response_text)
 
         ############## 输出响应体 ##############
-        if 'application/json' in res.headers['Content-Type'] and res.text[0] == '{':
-            self.response.append(json.dumps(json.loads(res.text), indent=4, ensure_ascii=False, sort_keys=False,
-                                       separators=(',', ';')))
-        elif 'xml' in res.headers['Content-Type'] and res.text[0] == '<':
-            self.response.append(printXML(res.text).replace('ns0:', ''))
-        else:
-            self.response.append('<br>' + ecd(res.text))
+        self.response.append(jsonXmlBody(res.headers,res.text.strip()))
         self.status.showMessage('Success 请求成功', 5000)
+
+        ############## 修改请求 ##############
+        self.request.clear()
+        temp=req_1.replace('\n','<br>')
+        for key,value in str_to_json(headers).items():
+            temp+='<span style="color:#00a000">%s:</span> %s<br>' % (str(key), str(value))
+        self.request.setText(temp)
+        self.request.append(req_2.strip())
 
 if __name__ == '__main__':
 
