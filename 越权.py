@@ -140,7 +140,13 @@ class Example(QMainWindow):
         if self.LogSwitch == 'True':
             action_log.setChecked(True)
         action_log.triggered.connect(lambda: self.update_check_state(action_log))
-        log=file.addAction(action_log)
+        file.addAction(action_log)
+
+        self.SetCookieSwitch='False'
+        action_SetCookie=QAction('Set-Cookie', self, checkable=True)
+        action_SetCookie.triggered.connect(lambda: self.update_check_state2(action_SetCookie))
+        file.addAction(action_SetCookie)
+
     def update_check_state(self, action):
         if action.isChecked():
             action.setIconVisibleInMenu(True)  # 显示勾号
@@ -149,6 +155,13 @@ class Example(QMainWindow):
             action.setIconVisibleInMenu(False)  # 隐藏勾号
             self.LogSwitch = 'False'
         self.updateConfigFile('Log=',self.LogSwitch)
+    def update_check_state2(self, action):
+        if action.isChecked():
+            action.setIconVisibleInMenu(True)  # 显示勾号
+            self.SetCookieSwitch = 'True'
+        else:
+            action.setIconVisibleInMenu(False)  # 隐藏勾号
+            self.SetCookieSwitch = 'False'
     ############## 修改配置文件中日志的值 ##############
     def updateConfigFile(self,key,value):
         with open(self.configFile, 'r', encoding='utf-8') as f:
@@ -285,12 +298,12 @@ class Example(QMainWindow):
         ############## 3 ##############
         self.proxy_button = QCheckBox("启用代理",self)
         grid.addWidget(self.proxy_button, 0, 2)
-        run1 = QPushButton("run", clicked=lambda: self.runReq(self.session1.toPlainText()))
-        run2 = QPushButton("run", clicked=lambda: self.runReq(self.session2.toPlainText()))
-        run3 = QPushButton("run", clicked=lambda: self.runReq(self.session3.toPlainText()))
-        run4 = QPushButton("run", clicked=lambda: self.runReq(self.session4.toPlainText()))
-        run5 = QPushButton("run", clicked=lambda: self.runReq(self.session5.toPlainText()))
-        run6 = QPushButton("run", clicked=lambda: self.runReq(self.session6.toPlainText()))
+        run1 = QPushButton("run", clicked=lambda: self.runReq(self.session1))
+        run2 = QPushButton("run", clicked=lambda: self.runReq(self.session2))
+        run3 = QPushButton("run", clicked=lambda: self.runReq(self.session3))
+        run4 = QPushButton("run", clicked=lambda: self.runReq(self.session4))
+        run5 = QPushButton("run", clicked=lambda: self.runReq(self.session5))
+        run6 = QPushButton("run", clicked=lambda: self.runReq(self.session6))
         grid.addWidget(run1, 1, 2)
         grid.addWidget(run2, 2, 2)
         grid.addWidget(run3, 3, 2)
@@ -380,7 +393,9 @@ class Example(QMainWindow):
         # self.request.setText(temp)
         # self.request.append(req_2.strip())
 
-    def runReq(self,session):
+    def runReq(self,textEdit):
+        print(self.SetCookieSwitch)
+        session=textEdit.toPlainText()
         ############## 设置代理 ##############
         if self.proxy_button.isChecked():
             proxies.update({'http': self.proxy.text(), 'https': self.proxy.text()})
@@ -398,7 +413,8 @@ class Example(QMainWindow):
             del dict_headers['Content-Length']
         except:
             pass
-        for key, value in str_to_json(session).items():
+        jsonSession=str_to_json(session)
+        for key, value in jsonSession.items():
             dict_headers[key] = value
 
         ############## 删除指定请求头 ##############
