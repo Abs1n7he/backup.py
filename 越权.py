@@ -6,13 +6,12 @@ import time
 import glob
 import requests
 import base64
-import urllib
 import urllib3
 urllib3.disable_warnings()
 
-from PyQt5.QtGui import QIcon, QTextCharFormat,QPixmap, QFont
+from PyQt5.QtGui import QIcon,QPixmap
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt, pyqtSlot, QMetaObject
+
 
 proxies={}
 def ecd(str):
@@ -76,6 +75,34 @@ def GetResponse(http,method,path,host,dict_headers,isjson,body):  #http为'http'
         return False
     return url,res
 
+class MyQTextEdit(QTextEdit): # 失焦
+    def __init__(self, parent=None):
+        super(MyQTextEdit, self).__init__(parent)
+    def setColor(self):
+        if self.objectName()=='request': #self.request.setObjectName('request') 区分上色手法
+            req = self.toPlainText()
+            headers = req.partition('\n')[2].partition('\n\n')[0].strip()
+            if req and headers:
+                temp = []
+                for i in headers.split('\n'):
+                    temp.append(
+                        '<span style="color:#00a000">%s</span>' % i.partition(':')[0] + ': ' + i.partition(':')[
+                            2].strip())
+                self.setText(
+                    req.partition(headers)[0].replace('\n', '<br>') + '<br>'.join(temp) + req.partition(headers)[
+                        2].replace('\n', '<br>'))
+        else:
+            temp=[]
+            for i in self.toPlainText().strip().split('\n'):
+                if i:
+                    temp.append('<span style="color:#00a000">%s</span>'% i.partition(':')[0]+': '+i.partition(':')[2].strip())
+            self.setText('<br>'.join(temp))
+    def focusOutEvent(self, event):
+        # 在这里编写失焦时想要执行的代码
+        super(MyQTextEdit, self).focusOutEvent(event)
+        self.setColor()
+
+
 class Example(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -114,38 +141,12 @@ class Example(QMainWindow):
                     self.request1 = line.partition('=')[2].strip()
             f.close()
 
-
         self.initUI()
         self.menu()
         self.show()
-
         ############## 状态栏显示 ##############
         self.status = self.statusBar()
         self.status.showMessage('黑盒越权测试 Bate 1.1   By:Abs1nThe', 5000)  # 状态栏显示 文本 5秒
-
-
-    def menu(self):
-        ############## 菜单栏 ##############
-        bar = self.menuBar()
-        # 往菜单栏添加菜单项目
-        file = bar.addMenu("文件")
-        # 给菜单项目添加子菜单
-        # new = file.addAction("新建")
-
-        save = file.addAction("保存配置")
-        save.setShortcut("CTRL+S")  # 设置快捷键
-        save.triggered.connect(self.saveConfig_windows)
-
-        action_log = QAction('记录日志', self, checkable=True)
-        if self.LogSwitch == 'True':
-            action_log.setChecked(True)
-        action_log.triggered.connect(lambda: self.update_check_state(action_log))
-        file.addAction(action_log)
-
-        self.SetCookieSwitch='False'
-        action_SetCookie=QAction('Set-Cookie', self, checkable=True)
-        action_SetCookie.triggered.connect(lambda: self.update_check_state2(action_SetCookie))
-        file.addAction(action_SetCookie)
 
     def update_check_state(self, action):
         if action.isChecked():
@@ -175,7 +176,6 @@ class Example(QMainWindow):
         with open(self.configFile, 'w', encoding='utf-8') as f:
             f.writelines(temp)
             f.close()
-
     def saveConfig_windows(self):
 
         # 创建新窗口
@@ -249,6 +249,29 @@ class Example(QMainWindow):
 
 
 
+    def menu(self):
+        ############## 菜单栏 ##############
+        bar = self.menuBar()
+        # 往菜单栏添加菜单项目
+        file = bar.addMenu("文件")
+        # 给菜单项目添加子菜单
+        # new = file.addAction("新建")
+
+        save = file.addAction("保存配置")
+        save.setShortcut("CTRL+S")  # 设置快捷键
+        save.triggered.connect(self.saveConfig_windows)
+
+        action_log = QAction('记录日志', self, checkable=True)
+        if self.LogSwitch == 'True':
+            action_log.setChecked(True)
+        action_log.triggered.connect(lambda: self.update_check_state(action_log))
+        file.addAction(action_log)
+
+        self.SetCookieSwitch='False'
+        action_SetCookie=QAction('Set-Cookie', self, checkable=True)
+        action_SetCookie.triggered.connect(lambda: self.update_check_state2(action_SetCookie))
+        file.addAction(action_SetCookie)
+
     def initUI(self):
 
         self.setWindowTitle('黑盒越权测试 Bate 1.1   By:Abs1nThe')
@@ -276,18 +299,13 @@ class Example(QMainWindow):
         grid.addWidget(QLabel('session6',self), 6, 0, 2, 1)
 
         ############## 2 ##############
-        self.session1 = QTextEdit(self)
-        self.session2 = QTextEdit(self)
-        self.session3 = QTextEdit(self)
-        self.session4 = QTextEdit(self)
-        self.session5 = QTextEdit(self)
-        self.session6 = QTextEdit(self)
-        self.session1.focusOutEvent = lambda event: self.setColor(self.session1)  # 绑定失去焦点事件
-        self.session2.focusOutEvent = lambda event: self.setColor(self.session2)
-        self.session3.focusOutEvent = lambda event: self.setColor(self.session3)
-        self.session4.focusOutEvent = lambda event: self.setColor(self.session4)
-        self.session5.focusOutEvent = lambda event: self.setColor(self.session5)
-        self.session6.focusOutEvent = lambda event: self.setColor(self.session6)
+        self.session1 = MyQTextEdit(self)# 失焦
+        self.session2 = MyQTextEdit(self)
+        self.session3 = MyQTextEdit(self)
+        self.session4 = MyQTextEdit(self)
+        self.session5 = MyQTextEdit(self)
+        self.session6 = MyQTextEdit(self)
+
         grid.addWidget(self.session1, 1, 1)
         grid.addWidget(self.session2, 2, 1)
         grid.addWidget(self.session3, 3, 1)
@@ -313,7 +331,8 @@ class Example(QMainWindow):
 
         ############## 4 ##############
         self.proxy = QLineEdit(self)
-        self.request = QTextEdit(self)
+        self.request = MyQTextEdit(self)# 失焦
+        self.request.setObjectName('request')
         self.request.setPlaceholderText("request")
         self.delete_header_button = QCheckBox("删除指定请求头", self)
         self.delete_req_header = QTextEdit(self)
@@ -321,14 +340,13 @@ class Example(QMainWindow):
         grid.addWidget(self.request, 1, 3, 5, 1)
         grid.addWidget(self.delete_header_button, 6, 3)
         grid.addWidget(self.delete_req_header, 7, 3)
-        self.request.focusOutEvent = lambda event: self.setColorForReq(self.request)  # 绑定失去焦点事件
+
 
         ############## 5 ##############
         self.response = QTextEdit(self)
         self.response.setPlaceholderText("response")
         self.check_res_header_button = QCheckBox("检查响应头",self)
-        self.check_res_header = QTextEdit(self)
-        self.check_res_header.focusOutEvent = lambda event: self.setColor(self.check_res_header)  # 绑定失去焦点事件
+        self.check_res_header = MyQTextEdit(self)# 失焦
         grid.addWidget(self.response, 1, 4, 5, 1)
         grid.addWidget(self.check_res_header_button, 6, 4)
         grid.addWidget(self.check_res_header, 7, 4)
@@ -343,14 +361,14 @@ class Example(QMainWindow):
                 eval('self.'+key+'.setText('+value+')')
             except:pass
         ############## 上色 ##############
-        self.setColor(self.session1)
-        self.setColor(self.session2)
-        self.setColor(self.session3)
-        self.setColor(self.session4)
-        self.setColor(self.session5)
-        self.setColor(self.session6)
-        self.setColor(self.check_res_header)
-        self.setColorForReq(self.request)
+        self.session1.setColor()
+        self.session2.setColor()
+        self.session3.setColor()
+        self.session4.setColor()
+        self.session5.setColor()
+        self.session6.setColor()
+        self.check_res_header.setColor()
+        self.request.setColor()
 
         ############## 不接受用户的富文本插入 ##############
         self.session1.setAcceptRichText(False)
@@ -369,36 +387,18 @@ class Example(QMainWindow):
         mainwidget.setLayout(grid)
         self.setCentralWidget(mainwidget)
 
-    def setColor(self, textEdit):
-        temp=[]
-        for i in textEdit.toPlainText().strip().split('\n'):
-            if i:
-                temp.append('<span style="color:#00a000">%s</span>'% i.partition(':')[0]+': '+i.partition(':')[2].strip())
-        textEdit.setText('<br>'.join(temp))
-
-    def setColorForReq(self, textEdit):
-        req=textEdit.toPlainText()
-        headers=req.partition('\n')[2].partition('\n\n')[0].strip()
-        temp = []
-        for i in headers.split('\n'):
-            temp.append(
-                '<span style="color:#00a000">%s</span>' % i.partition(':')[0] + ': ' + i.partition(':')[2].strip())
-        textEdit.setText(req.partition(headers)[0].replace('\n','<br>')+'<br>'.join(temp)+req.partition(headers)[2].replace('\n','<br>'))
-
-        # ############## 修改请求 ##############
-        # self.request.clear()
-        # temp=req_1.replace('\n','<br>')
-        # for key,value in str_to_json(headers).items():
-        #     temp+='<span style="color:#00a000">%s:</span> %s<br>' % (str(key), str(value))
-        # self.request.setText(temp)
-        # self.request.append(req_2.strip())
 
     def runReq(self,textEdit):
         print(self.SetCookieSwitch)
+
+        self.response.clear()
+
         session=textEdit.toPlainText()
         ############## 设置代理 ##############
         if self.proxy_button.isChecked():
             proxies.update({'http': self.proxy.text(), 'https': self.proxy.text()})
+        else:
+            proxies.update({'http': '', 'https': ''})
 
         ############## 从request获取请求方式、path、header等 ##############
         req = self.request.toPlainText()
@@ -425,8 +425,7 @@ class Example(QMainWindow):
                 except:
                     pass
 
-        # 置空
-        self.response.clear()
+
         self.status.showMessage('Loading...', 5000)
         ############## 发送请求 ##############
         try:
@@ -484,8 +483,6 @@ class Example(QMainWindow):
 
 
 if __name__ == '__main__':
-
-
     app = QApplication(sys.argv)
     try:
         with open(glob.glob("*.qss")[0]) as f:
