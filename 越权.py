@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import *
 
 
 proxies={}
+################ 自定义函数 ################
 def ecd(str):
     return str.replace('<','&lt;').replace('>','&gt;')
 def jsonXmlBody(headers,body):
@@ -75,7 +76,8 @@ def GetResponse(http,method,path,host,dict_headers,isjson,body):  #http为'http'
         return False
     return url,res
 
-class MyQTextEdit(QTextEdit): # 失焦
+################ 自定义QTextEdit + 失焦 ################
+class MyQTextEdit(QTextEdit):
     def __init__(self, parent=None):
         super(MyQTextEdit, self).__init__(parent)
     def setColor(self):
@@ -85,20 +87,15 @@ class MyQTextEdit(QTextEdit): # 失焦
             if req and headers:
                 temp = []
                 for i in headers.split('\n'):
-                    temp.append(
-                        '<span style="color:#00a000">%s</span>' % i.partition(':')[0] + ': ' + i.partition(':')[
-                            2].strip())
-                self.setText(
-                    req.partition(headers)[0].replace('\n', '<br>') + '<br>'.join(temp) + req.partition(headers)[
-                        2].replace('\n', '<br>'))
+                    temp.append('<span style="color:#00a000">%s</span>' % i.partition(':')[0] + ': ' + i.partition(':')[2].strip())
+                self.setText(req.partition(headers)[0].replace('\n', '<br>') + '<br>'.join(temp) + req.partition(headers)[2].replace('\n', '<br>'))
         else:
             temp=[]
             for i in self.toPlainText().strip().split('\n'):
                 if i:
                     temp.append('<span style="color:#00a000">%s</span>'% i.partition(':')[0]+': '+i.partition(':')[2].strip())
             self.setText('<br>'.join(temp))
-    def focusOutEvent(self, event):
-        # 在这里编写失焦时想要执行的代码
+    def focusOutEvent(self, event): #失焦
         super(MyQTextEdit, self).focusOutEvent(event)
         self.setColor()
 
@@ -106,7 +103,6 @@ class MyQTextEdit(QTextEdit): # 失焦
 class Example(QMainWindow):
     def __init__(self):
         super().__init__()
-
         ############## 获取配置文件，初始化配置文件 ##############
         self.configFile = 'BlackBox.config'
         self.logFile = time.strftime("%Y%m%d.html", time.localtime(time.time()))
@@ -122,6 +118,7 @@ class Example(QMainWindow):
                         '#检查响应头\n' +
                         'cherk_res_header={"x-content-type-option":"nosniff","Access-Control-Allow-Origin":"^http(.*?).baidu.com","Access-Control-Allow-Credentials":"true","X-Frame-Options":"(SAMEORIGIN)|(sameorigin)","Content-Security-Policy":"frame-ancestors https://*.baidu.com","x-xss-protection":"1; mode=block"}')
                 f.close()
+
         ############## 读取配置 ##############
         self.sessions = {}
         self.LogSwitch = 'False'
@@ -148,34 +145,33 @@ class Example(QMainWindow):
         self.status = self.statusBar()
         self.status.showMessage('黑盒越权测试 Bate 1.1   By:Abs1nThe', 5000)  # 状态栏显示 文本 5秒
 
-    def update_check_state(self, action):
+    def update_check_state(self,action):
         if action.isChecked():
             action.setIconVisibleInMenu(True)  # 显示勾号
-            self.LogSwitch = 'True'
+            value = 'True'
         else:
             action.setIconVisibleInMenu(False)  # 隐藏勾号
-            self.LogSwitch = 'False'
-        self.updateConfigFile('Log=',self.LogSwitch)
-    def update_check_state2(self, action):
-        if action.isChecked():
-            action.setIconVisibleInMenu(True)  # 显示勾号
-            self.SetCookieSwitch = 'True'
-        else:
-            action.setIconVisibleInMenu(False)  # 隐藏勾号
-            self.SetCookieSwitch = 'False'
-    ############## 修改配置文件中日志的值 ##############
-    def updateConfigFile(self,key,value):
-        with open(self.configFile, 'r', encoding='utf-8') as f:
-            temp=[]
-            for line in f:
-                if line.startswith(key):
-                    temp.append(key+value+'\n')
-                else:
-                    temp.append(line)
-            f.close()
-        with open(self.configFile, 'w', encoding='utf-8') as f:
-            f.writelines(temp)
-            f.close()
+            value = 'False'
+        if action.objectName()=='log':
+            self.LogSwitch = value
+            #self.updateConfigFile('Log=',value)
+        elif action.objectName()=='setCookie':
+            self.SetCookieSwitch = value
+
+
+    # ############## 修改配置文件中日志的值 ##############          非必要
+    # def updateConfigFile(self,key,value):
+    #     with open(self.configFile, 'r', encoding='utf-8') as f:
+    #         temp=[]
+    #         for line in f:
+    #             if line.startswith(key):
+    #                 temp.append(key+value+'\n')
+    #             else:
+    #                 temp.append(line)
+    #         f.close()
+    #     with open(self.configFile, 'w', encoding='utf-8') as f:
+    #         f.writelines(temp)
+    #         f.close()
     def saveConfig_windows(self):
 
         # 创建新窗口
@@ -262,14 +258,16 @@ class Example(QMainWindow):
         save.triggered.connect(self.saveConfig_windows)
 
         action_log = QAction('记录日志', self, checkable=True)
+        action_log.setObjectName('log')
         if self.LogSwitch == 'True':
             action_log.setChecked(True)
         action_log.triggered.connect(lambda: self.update_check_state(action_log))
         file.addAction(action_log)
 
-        self.SetCookieSwitch='False'
+        self.SetCookieSwitch='False'    ########################                  self.SetCookieSwitch
         action_SetCookie=QAction('Set-Cookie', self, checkable=True)
-        action_SetCookie.triggered.connect(lambda: self.update_check_state2(action_SetCookie))
+        action_SetCookie.setObjectName('setCookie')
+        action_SetCookie.triggered.connect(lambda: self.update_check_state(action_SetCookie))
         file.addAction(action_SetCookie)
 
     def initUI(self):
@@ -389,7 +387,7 @@ class Example(QMainWindow):
 
 
     def runReq(self,textEdit):
-        print(self.SetCookieSwitch)
+        # print(self.SetCookieSwitch)
 
         self.response.clear()
 
