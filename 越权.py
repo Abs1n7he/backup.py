@@ -18,8 +18,6 @@ proxies={}
 def ecd(str):
     return str.replace('<','&lt;').replace('>','&gt;')
 def jsonXmlBody(headers,body):
-    print('Content-Type' in headers.keys())
-    print(headers['Content-Type'])
     if 'Content-Type' in headers.keys():
         if 'json' in headers['Content-Type'] and body.startswith('{'):
             return json.dumps(json.loads(body), indent=4, ensure_ascii=False, sort_keys=False,separators=(',', ';'))
