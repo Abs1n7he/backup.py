@@ -85,13 +85,13 @@ class MyQTextEdit(QTextEdit):
             if req and headers:
                 temp = []
                 for i in headers.split('\n'):
-                    temp.append('<span style="color:#00a000">%s</span>' % i.partition(':')[0] + ': ' + i.partition(':')[2].strip())
-                self.setText(req.partition(headers)[0].replace('\n', '<br>') + '<br>'.join(temp) + req.partition(headers)[2].replace('\n', '<br>'))
+                    temp.append('<span style="color:#00a000">%s</span>' % ecd(i.partition(':')[0]) + ': ' + ecd(i.partition(':')[2].strip()))
+                self.setText(ecd(req.partition(headers)[0]).replace('\n', '<br>') + '<br>'.join(temp) + req.partition(headers)[2].replace('\n', '<br>'))
         else:
             temp=[]
             for i in self.toPlainText().strip().split('\n'):
                 if i:
-                    temp.append('<span style="color:#00a000">%s</span>'% i.partition(':')[0]+': '+i.partition(':')[2].strip())
+                    temp.append('<span style="color:#00a000">%s</span>'% ecd(i.partition(':')[0])+': '+ecd(i.partition(':')[2].strip()))
             self.setText('<br>'.join(temp))
     def focusOutEvent(self, event): #失焦
         super(MyQTextEdit, self).focusOutEvent(event)
@@ -157,7 +157,7 @@ class Example(QMainWindow):
             self.SetCookieSwitch = value
 
 
-    # ############## 修改配置文件中日志的值 ##############          非必要
+    # ############## 修改配置文件中日志的值 ##############非必要
     # def updateConfigFile(self,key,value):
     #     with open(self.configFile, 'r', encoding='utf-8') as f:
     #         temp=[]
@@ -350,13 +350,12 @@ class Example(QMainWindow):
 
         ############## 赋值 ##############
         for key, value in self.sessions.items():
-            eval('self.'+key + '.setText(json_to_str(' + value + ').strip())')
-        for key,value in {'proxy':'self.proxy1.strip()','request':r'self.request1.replace("\\n","\n")',
-                          'delete_req_header':'self.delete_req_header1.strip()',
-                          'check_res_header':'json_to_str(json.loads(self.check_res_header1)).strip()'}.items():
-            try:
-                eval('self.'+key+'.setText('+value+')')
-            except:pass
+            eval('self.'+key + '.setText(json_to_str(' + ecd(value) + ').strip())')
+        self.proxy.setText(self.proxy1.strip())
+        self.request.setText(ecd(self.request1.replace("\\n","\n")))
+        self.delete_req_header.setText(ecd(self.delete_req_header1.strip()))
+        self.check_res_header.setText(ecd(json_to_str(json.loads(self.check_res_header1)).strip()))
+
         ############## 上色 ##############
         self.session1.setColor()
         self.session2.setColor()
@@ -366,6 +365,7 @@ class Example(QMainWindow):
         self.session6.setColor()
         self.check_res_header.setColor()
         self.request.setColor()
+
 
         ############## 不接受用户的富文本插入 ##############
         self.session1.setAcceptRichText(False)
@@ -457,9 +457,9 @@ class Example(QMainWindow):
             for key, value in str_to_json(self.check_res_header.toPlainText()).items():
                 if key in res.headers.keys() and not (
                         value == res.headers[key] or re.findall(value, res.headers[key])):
-                    bad_res_header.append(key)
+                    bad_res_header.append(ecd(key))
                 else:
-                    lack_res_header.append(key)
+                    lack_res_header.append(ecd(key))
 
         ############## 输出响应码，响应头 ##############
         response_text = str(res.status_code) + ' ' + res.reason + '<br>'
@@ -469,8 +469,7 @@ class Example(QMainWindow):
             else:
                 response_text += '<span style="color:#00a000">%s:</span> %s<br>' % (str(key), str(value))
         if len(lack_res_header) > 0:
-            response_text += '<span style="color:#ff0000">缺失响应头: <br>' + '<br>'.join(
-                lack_res_header) + '</span><br>'
+            response_text += '<span style="color:#ff0000">缺失响应头: <br>' + '<br>'.join(lack_res_header) + '</span><br>'
         self.response.setText(response_text)
 
         ############## 输出响应体 ##############
