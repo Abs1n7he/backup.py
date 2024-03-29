@@ -11,68 +11,9 @@ urllib3.disable_warnings()
 
 from PyQt5.QtGui import QIcon,QPixmap
 from PyQt5.QtWidgets import *
-
+from my_requests import *
 
 proxies={}
-################ 自定义函数 ################
-def ecd(str):
-    return str.replace('<','&lt;').replace('>','&gt;')
-def jsonXmlBody(headers,body):
-    if 'Content-Type' in headers.keys():
-        if 'json' in headers['Content-Type'] and body.startswith('{'):
-            return json.dumps(json.loads(body), indent=4, ensure_ascii=False, sort_keys=False,separators=(',', ';'))
-        elif 'xml' in headers['Content-Type'] and body.startswith('<'):
-            return printXML(body).replace('ns0:','')
-        else:
-            return '<br>'+ecd(body)
-def str_to_json(str):
-    dict1={}
-    for i in str.split('\n'):
-        dict1[i.partition(':')[0].strip()]=i.partition(':')[2].strip()
-    return dict(filter(lambda x: x[0]!='',dict1.items())) #删除空key
-def json_to_str(dict):
-    return ''.join([key+': '+value+'\n' for key,value in dict.items()])
-
-import xml.etree.ElementTree as ET
-def printXML(str):          # XML 字符串格式化打印
-    # 创建XML元素
-    element = ET.XML(str)
-    # 使用indent()函数进行格式化打印
-    ET.indent(element)
-    return ET.tostring(element, encoding='unicode')
-
-def GetRequest(req): #从字符串获取请求内容
-    method= req.partition(' ')[0].strip().lower()
-    path=   req.partition(' ')[2].partition(' ')[0].strip()
-    host=   req.partition('\n')[2].partition('\n')[0].partition(':')[2].strip()
-    headers=req.partition('\n')[2].partition('\n')[2].partition('\n\n')[0].strip()
-    dict_headers = str_to_json(headers)
-    body = req.partition('\n\n')[2]
-    if 'Content-Type' in dict_headers.keys() and 'json' in dict_headers['Content-Type'] and body.strip().startswith('{'):
-        isjson=True
-        body = json.loads(body)
-    else:
-        isjson=False
-    if not (method and path and host):#缺失告警
-        return False,method,path,host,headers,dict_headers,isjson,body
-    else:
-        return True,method,path,host,headers,dict_headers,isjson,body
-
-def GetResponse(http,method,path,host,dict_headers,isjson,body):  #http为'http'或'https'
-    url = http + "://" + host + path
-    try:
-        if method in ['get', 'options', 'delete','head']:
-            res = eval('requests.' + method + '(url,headers=dict_headers,timeout=20,verify=False,proxies=proxies,allow_redirects=False)')
-        elif method in ['post', 'put']:
-            if isjson:
-                res = eval('requests.' + method + '(url,headers=dict_headers,json=body,timeout=20,verify=False,proxies=proxies,allow_redirects=False)')
-            else:
-                res = eval('requests.' + method + '(url,headers=dict_headers,data=body,timeout=20,verify=False,proxies=proxies,allow_redirects=False)')
-        else:#请求方式错误告警
-            return False
-    except:
-        return False
-    return url,res
 
 ################ 自定义QTextEdit + 失焦 ################
 class MyQTextEdit(QTextEdit):
@@ -399,7 +340,7 @@ class Example(QMainWindow):
 
         ############## 从request获取请求方式、path、header等 ##############
         req = self.request.toPlainText()
-        iferror, method, path, host, headers, dict_headers, isjson, body = GetRequest(req)
+        iferror,method,path,host,url,headers,dict_headers,isjson,body = GetRequest(self.https.currentText(),req)
         if not iferror:  # 缺失告警
             self.response.setText('<span style="color:#ff0000">bad request</span>')
             self.status.showMessage('Error 请求失败,检查method,path,host', 5000)
@@ -426,7 +367,7 @@ class Example(QMainWindow):
         self.status.showMessage('Loading...', 5000)
         ############## 发送请求 ##############
         try:
-            url, res = GetResponse(self.https.currentText(), method, path, host, dict_headers, isjson, body)
+            res = GetResponse(method,url,dict_headers,isjson,body,proxies)
         except:
             self.response.setText('<span style="color:#ff0000">request fail,check host or http</span>')
             self.status.showMessage('Error 请求失败,检查host,http', 5000)
@@ -473,9 +414,8 @@ class Example(QMainWindow):
         self.response.setText(response_text)
 
         ############## 输出响应体 ##############
-        self.response.append(jsonXmlBody(res.headers,res.text.strip()))
+        self.response.append(json_or_xml_body(res.headers,res.text.strip()))
         self.status.showMessage('Success 请求成功', 5000)
-
 
 
 if __name__ == '__main__':
