@@ -28,6 +28,14 @@ class MyQTextEdit(QTextEdit):
                 for i in headers.split('\n'):
                     temp.append('<span style="color:#00a000">%s</span>' % ecd(i.partition(':')[0]) + ': ' + ecd(i.partition(':')[2].strip()))
                 self.setText(ecd(req.partition(headers)[0]).replace('\n', '<br>') + '<br>'.join(temp) + req.partition(headers)[2].replace('\n', '<br>'))
+        elif self.objectName()=='header':
+            temp=[]
+            for i in self.toPlainText().strip().split('\n'):
+                if i:
+                    key=ecd(i.partition(':')[0])
+                    if key in ['Cookie','X-Csrf_Token']:
+                        temp.append('<span style="color:#00a000">%s</span>'% key+': '+ecd(i.partition(':')[2].strip()))
+            self.setText('<br>'.join(temp))
         else:
             temp=[]
             for i in self.toPlainText().strip().split('\n'):
@@ -238,13 +246,21 @@ class Example(QMainWindow):
         grid.addWidget(QLabel('请求头6',self), 6, 0, 2, 1)
 
         ############## 2 ##############
+        self.onlyCookies = QLineEdit(self)
+        self.onlyCookies.setPlaceholderText('筛选请求头')
         self.header1 = MyQTextEdit(self)# 失焦
         self.header2 = MyQTextEdit(self)
         self.header3 = MyQTextEdit(self)
         self.header4 = MyQTextEdit(self)
         self.header5 = MyQTextEdit(self)
         self.header6 = MyQTextEdit(self)
-
+        self.header1.setObjectName('header')
+        self.header2.setObjectName('header')
+        self.header3.setObjectName('header')
+        self.header4.setObjectName('header')
+        self.header5.setObjectName('header')
+        self.header6.setObjectName('header')
+        grid.addWidget(self.onlyCookies, 0, 1)
         grid.addWidget(self.header1, 1, 1)
         grid.addWidget(self.header2, 2, 1)
         grid.addWidget(self.header3, 3, 1)
@@ -396,12 +412,16 @@ class Example(QMainWindow):
         bad_res_header = []  # 错误响应头
         lack_res_header = []  # 缺失响应头
         if self.check_res_header_button.isChecked():
-            for key, value in str_to_json(self.check_res_header.toPlainText()).items():
-                if key in res.headers.keys() and not (
-                        value == res.headers[key] or re.findall(value, res.headers[key])):
-                    bad_res_header.append(ecd(key))
-                else:
-                    lack_res_header.append(ecd(key))
+            dict_check_res_header=str_to_json(self.check_res_header.toPlainText())
+            dict_res_header=dict(res.headers)
+            dict_res_header2 = {key.replace(' ', '').lower(): dict_res_header[key].replace(' ', '').lower() for key, value in dict_res_header.items()}
+
+            for key,value in dict_check_res_header.items():
+                if key.replace(' ', '').lower() not in dict_res_header2.keys():
+                    lack_res_header.append(ecd(key))  # 缺失
+                elif value.replace(' ', '').lower() != dict_res_header2[key.replace(' ', '').lower()]:
+                    bad_res_header.append(ecd(key))  # 错误
+
 
         ############## 输出响应码，响应头 ##############
         response_text = str(res.status_code) + ' ' + res.reason + '<br>'
