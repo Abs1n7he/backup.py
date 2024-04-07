@@ -65,8 +65,18 @@ class Example(QMainWindow):
                         '#删除指定请求头\n' +
                         'delete_req_header=Cookie,X-Csrf_Token,Referer\n\n' +
                         '#检查响应头\n' +
-                        'cherk_res_header={"x-content-type-option":"nosniff","Access-Control-Allow-Origin":"^http(.*?).baidu.com","Access-Control-Allow-Credentials":"true","X-Frame-Options":"(SAMEORIGIN)|(sameorigin)","Content-Security-Policy":"frame-ancestors https://*.baidu.com","x-xss-protection":"1; mode=block"}')
+                        'cherk_res_header={' +
+                            '"x-frame-options":"(sameorin)|(deny)",' +
+                            '"x-content-type-option":"nosniff",' +
+                            '"x-xss-protection":"1;mode-block",' +
+                            '"strict-transport-security":"*",' +
+                            '"content-security-policy":"*",' +
+                            '"access-control-allow-origin":"^http(.*?).huawei.com",' +
+                            '"access-control-allow-credentials":"true"}')
                 f.close()
+
+
+
 
         ############## 读取配置 ##############
         self.headers = {}
@@ -301,6 +311,7 @@ class Example(QMainWindow):
         self.response = QTextEdit(self)
         self.response.setPlaceholderText("response")
         self.check_res_header_button = QCheckBox("检查响应头",self)
+        self.check_res_header_button.setChecked(True)
         self.check_res_header = MyQTextEdit(self)# 失焦
         grid.addWidget(self.response, 1, 4, 5, 1)
         grid.addWidget(self.check_res_header_button, 6, 4)
@@ -414,13 +425,19 @@ class Example(QMainWindow):
         if self.check_res_header_button.isChecked():
             dict_check_res_header=str_to_json(self.check_res_header.toPlainText())
             dict_res_header=dict(res.headers)
-            dict_res_header2 = {key.replace(' ', '').lower(): dict_res_header[key].replace(' ', '').lower() for key, value in dict_res_header.items()}
+            dict_res_header2 = {key.lower(): dict_res_header[key].replace(' ', '').lower() for key, value in dict_res_header.items()}
 
             for key,value in dict_check_res_header.items():
-                if key.replace(' ', '').lower() not in dict_res_header2.keys():
+                if key.lower() not in dict_res_header2.keys():
                     lack_res_header.append(ecd(key))  # 缺失
+                elif value==dict_res_header[key] or re.findall(value,dict_res_header[key]):
+                    pass
                 elif value.replace(' ', '').lower() != dict_res_header2[key.replace(' ', '').lower()]:
+                    print(value, dict_res_header[key])
                     bad_res_header.append(ecd(key))  # 错误
+                else:
+                    print('还能有什么情况？',key,value)
+
 
 
         ############## 输出响应码，响应头 ##############
@@ -431,7 +448,7 @@ class Example(QMainWindow):
             else:
                 response_text += '<span style="color:#00a000">%s:</span> %s<br>' % (str(key), str(value))
         if len(lack_res_header) > 0:
-            response_text += '<span style="color:#ff0000">缺失响应头: <br>' + '<br>'.join(lack_res_header) + '</span><br>'
+            response_text += '<span style="color:#ff0000">缺失安全响应头: <br>' + '<br>'.join(lack_res_header) + '</span><br>'
         self.response.setText(response_text)
 
         ############## 输出响应体 ##############
