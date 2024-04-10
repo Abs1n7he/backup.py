@@ -33,7 +33,7 @@ class MyQTextEdit(QTextEdit):
             for i in self.toPlainText().strip().split('\n'):
                 if i:
                     key=ecd(i.partition(':')[0])
-                    if key in ['Cookie','X-Csrf_Token']:
+                    if key.lower() in [k.lower() for k in ['cookie','X-Csrf_Token']]:
                         temp.append('<span style="color:#00a000">%s</span>'% key+': '+ecd(i.partition(':')[2].strip()))
             self.setText('<br>'.join(temp))
         else:
@@ -426,15 +426,19 @@ class Example(QMainWindow):
             dict_check_res_header=str_to_json(self.check_res_header.toPlainText())
             dict_res_header=dict(res.headers)
             dict_res_header2 = {key.lower(): dict_res_header[key].replace(' ', '').lower() for key, value in dict_res_header.items()}
+            dict_res_header3 = {key.lower(): dict_res_header[key] for key, value in dict_res_header.items()}
 
             for key,value in dict_check_res_header.items():
+
                 if key.lower() not in dict_res_header2.keys():
                     lack_res_header.append(ecd(key))  # 缺失
-                elif value==dict_res_header[key] or re.findall(value,dict_res_header[key]):
+                    # print('缺失',key)
+                elif value.replace(' ', '').lower() == dict_res_header2[key.lower()] or re.findall(value,dict_res_header3[key.lower()],re.IGNORECASE):
+                    # print('pass', key)
                     pass
-                elif value.replace(' ', '').lower() != dict_res_header2[key.replace(' ', '').lower()]:
-                    print(value, dict_res_header[key])
-                    bad_res_header.append(ecd(key))  # 错误
+                elif value.replace(' ', '').lower() != dict_res_header2[key.lower()]:
+                    bad_res_header.append(ecd(key.lower()))  # 错误
+                    # print('错误',key)
                 else:
                     print('还能有什么情况？',key,value)
 
@@ -442,8 +446,8 @@ class Example(QMainWindow):
 
         ############## 输出响应码，响应头 ##############
         response_text = str(res.status_code) + ' ' + res.reason + '<br>'
-        for key, value in res.headers.items():
-            if key in bad_res_header+['Set-Cookie']:
+        for key, value in dict_res_header.items():
+            if key.lower() in bad_res_header+['set-cookie']:
                 response_text += '<span style="color:#ff0000">%s: %s</span><br>' % (str(key), str(value))
             else:
                 response_text += '<span style="color:#00a000">%s:</span> %s<br>' % (str(key), str(value))
