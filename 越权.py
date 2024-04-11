@@ -67,10 +67,10 @@ class Example(QMainWindow):
                         '#检查响应头\n' +
                         'cherk_res_header={' +
                             '"x-frame-options":"(sameorin)|(deny)",' +
-                            '"x-content-type-option":"nosniff",' +
-                            '"x-xss-protection":"1;mode-block",' +
-                            '"strict-transport-security":"*",' +
-                            '"content-security-policy":"*",' +
+                            '"x-content-type-options":"nosniff",' +
+                            '"x-xss-protection":"1;mode=block",' +
+                            '"strict-transport-security":"",' +
+                            '"content-security-policy":"",' +
                             '"access-control-allow-origin":"^http(.*?).huawei.com",' +
                             '"access-control-allow-credentials":"true"}')
                 f.close()
@@ -422,25 +422,25 @@ class Example(QMainWindow):
         ############## 检查响应头 ##############
         bad_res_header = []  # 错误响应头
         lack_res_header = []  # 缺失响应头
+        dict_res_header = dict(res.headers)
         if self.check_res_header_button.isChecked():
-            dict_check_res_header=str_to_json(self.check_res_header.toPlainText())
-            dict_res_header=dict(res.headers)
-            dict_res_header2 = {key.lower(): dict_res_header[key].replace(' ', '').lower() for key, value in dict_res_header.items()}
-            dict_res_header3 = {key.lower(): dict_res_header[key] for key, value in dict_res_header.items()}
-
-            for key,value in dict_check_res_header.items():
-
-                if key.lower() not in dict_res_header2.keys():
-                    lack_res_header.append(ecd(key))  # 缺失
-                    # print('缺失',key)
-                elif value.replace(' ', '').lower() == dict_res_header2[key.lower()] or re.findall(value,dict_res_header3[key.lower()],re.IGNORECASE):
-                    # print('pass', key)
-                    pass
-                elif value.replace(' ', '').lower() != dict_res_header2[key.lower()]:
-                    bad_res_header.append(ecd(key.lower()))  # 错误
-                    # print('错误',key)
-                else:
-                    print('还能有什么情况？',key,value)
+                dict_check_res_header=str_to_json(self.check_res_header.toPlainText())
+                dict_res_header2 = {key.lower(): dict_res_header[key].replace(' ', '').lower() for key, value in dict_res_header.items()}
+                dict_res_header3 = {key.lower(): dict_res_header[key] for key, value in dict_res_header.items()}
+                for key,value in dict_check_res_header.items():
+                    try:
+                        if key.lower() not in dict_res_header2.keys():
+                            lack_res_header.append(ecd(key))  # 缺失
+                        elif value.strip()=='': #只检查是否存在
+                            pass
+                        elif value.replace(' ', '').lower() == dict_res_header2[key.lower()] or re.findall(value,dict_res_header3[key.lower()],re.IGNORECASE):
+                            pass
+                        elif value.replace(' ', '').lower() != dict_res_header2[key.lower()]:
+                            bad_res_header.append(ecd(key.lower()))  # 错误
+                        else:
+                            print('还能有什么情况？',key,value)
+                    except:
+                        pass
 
 
 

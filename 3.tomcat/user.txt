@@ -1,0 +1,14 @@
+tomcat
+admin
+root
+manager
+vps
+role
+role1
+both
+j2deployer
+ovwebusr
+owaspbwa
+kdsxc
+OvW*busr1
+test

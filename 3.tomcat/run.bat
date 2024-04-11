@@ -1,0 +1,1 @@
+wt -d "%CD%"  python tomcat.py
