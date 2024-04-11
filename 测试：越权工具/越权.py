@@ -368,26 +368,22 @@ class Example(QMainWindow):
 
         ############## 从request获取请求方式、path、header等 ##############
         req = self.request.toPlainText()
-        iferror,method,path,host,url,headers,dict_headers,isjson,body = GetRequest(self.https.currentText(),req)
+        iferror,method,path,host,url,headers,isjson,body = GetRequest(self.https.currentText(),req)
         if not iferror:  # 缺失告警
             self.response.setText('<span style="color:#ff0000">bad request</span>')
             self.status.showMessage('Error 请求失败,检查method,path,host', 5000)
             return
 
-        ############## 删除长度，替换header ##############
-        try:
-            del dict_headers['Content-Length']
-        except:
-            pass
+        ############## 替换header ##############
         jsonHeader=str_to_json(header)
         for key, value in jsonHeader.items():
-            dict_headers[key] = value
+            headers[key] = value
 
         ############## 删除指定请求头 ##############
         if self.delete_header_button.isChecked():
             for i in self.delete_req_header.toPlainText().split(','):
                 try:
-                    dict_headers.pop(i.strip())
+                    headers.pop(i.strip())
                 except:
                     pass
 
@@ -395,14 +391,14 @@ class Example(QMainWindow):
         self.status.showMessage('Loading...', 5000)
         ############## 发送请求 ##############
         try:
-            res = GetResponse(method,url,dict_headers,isjson,body,proxies)
+            res = GetResponse(method,url,headers,isjson,body,proxies)
         except:
             self.response.setText('<span style="color:#ff0000">request fail,check host or http</span>')
             self.status.showMessage('Error 请求失败,检查host,http', 5000)
             return
 
-        req_1=req.partition(headers)[0]
-        req_2=req.partition(headers)[2]
+        req_1='\n'.join(req.split('\n')[0:2])
+        req_2=req.partition('\n\n')[2]
         ############## 记录日志 ##############html
         if self.LogSwitch == 'True':
             if not os.path.isfile(self.logFile):
@@ -413,7 +409,7 @@ class Example(QMainWindow):
                 log.write(time.strftime("<details><summary>[%Y/%m/%d %H:%M:%S] ",
                                         time.localtime(time.time())) + url + "</summary>" +
                           "<div class=\"div1\"><p>" + req_1.replace('\n', '<br>') +
-                          ''.join([key + ': ' + value + '<br>' for key, value in dict_headers.items()]) + req_2.replace('\n', '<br>') + "</p><br>")
+                          ''.join([key + ': ' + value + '<br>' for key, value in headers.items()]) +'<br>'+ req_2.replace('\n', '<br>') + "</p><br>")
                 log.write('<p>[response:]<br>' + str(res.status_code) + " " + res.reason + "<br>" +
                           ''.join([k + ':' + v + '<br>' for k, v in res.headers.items()]) + "<br><span>" +
                           ecd(res.text) + "</span></p></div></details>")
