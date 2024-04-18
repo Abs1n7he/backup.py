@@ -1,1 +1,0 @@
-wt -d "%CD%" cmd /k xray.exe --log-level debug ws --listen 127.0.0.1:8888 --ho %userprofile%\Desktop\xray\xray-debug.html
