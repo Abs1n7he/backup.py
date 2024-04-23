@@ -1,0 +1,24 @@
+import ast
+
+
+self.headers = {}
+self.headers = ['','','','','','']
+self.request1=''
+self.delete_req_header1=''
+
+self.headers[line.partition('=')[0].strip()] = line.partition('=')[2].replace('\'', '"').strip()
+self.headers[int(line[6])-1] = line.partition('=')[2].replace('\'', '"').strip()
+
+        ############## 赋值 ##############
+        try:
+            for i in range(6):
+                if self.headers[i] !='':
+                    eval('self.header'+str(i+1)+'.setText(ecd(json_to_str(ast.literal_eval(self.headers['+str(i)+']))))')
+                eval('self.headerTxt'+str(i+1)+'.setText(self.listHeader['+str(i)+'].strip())')
+            self.proxy.setText(self.proxy1.strip())
+            self.onlyCookies.setText(self.onlyCookies1.strip())
+            self.request.setText(ecd(self.request1.replace("\\n", "\n")))
+            self.delete_req_header.setText(ecd(self.delete_req_header1.strip()))
+            self.check_res_header.setText(ecd(json_to_str(json.loads(self.check_res_header1)).strip()))
+        except:
+            self.response.setText('config文件不规范')
