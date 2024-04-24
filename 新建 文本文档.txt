@@ -1,24 +1,67 @@
-import ast
+self.response.append('<span style="color:#000000">%s</span><br>' % json_or_xml_body(res.headers, res.text.strip()).replace('\n', '<br>'))
+
+        for key, value in dict_res_header.items():
+            if key.lower() in bad_res_header:
+                response_text += '<span style="color:#DC143C">%s: %s</span><br>' % (str(key), str(value))
+            elif key.lower() in ['set-cookie','content-length']:
+                response_text += '<span style="color:#FF8C00">%s:</span> %s<br>' % (str(key), str(value))
+            else:
+                response_text += '<span style="color:#00A000">%s:</span> %s<br>' % (str(key), str(value))
 
 
-self.headers = {}
-self.headers = ['','','','','','']
-self.request1=''
-self.delete_req_header1=''
 
-self.headers[line.partition('=')[0].strip()] = line.partition('=')[2].replace('\'', '"').strip()
-self.headers[int(line[6])-1] = line.partition('=')[2].replace('\'', '"').strip()
 
-        ############## 赋值 ##############
-        try:
-            for i in range(6):
-                if self.headers[i] !='':
-                    eval('self.header'+str(i+1)+'.setText(ecd(json_to_str(ast.literal_eval(self.headers['+str(i)+']))))')
-                eval('self.headerTxt'+str(i+1)+'.setText(self.listHeader['+str(i)+'].strip())')
-            self.proxy.setText(self.proxy1.strip())
-            self.onlyCookies.setText(self.onlyCookies1.strip())
-            self.request.setText(ecd(self.request1.replace("\\n", "\n")))
-            self.delete_req_header.setText(ecd(self.delete_req_header1.strip()))
-            self.check_res_header.setText(ecd(json_to_str(json.loads(self.check_res_header1)).strip()))
-        except:
-            self.response.setText('config文件不规范')
+# green   #00A000
+# red     #DC143C
+# orange  #FF8C00
+
+
+
+    def setColor(self):
+        if self.objectName() == 'request':  # self.request.setObjectName('request') 区分上色手法
+            req = self.toPlainText()
+            headers = req.partition('\n')[2].partition('\n\n')[0].strip()
+            if req and headers:
+                temp = []
+                for i in headers.split('\n'):
+                    key=ecd(i.partition(':')[0])
+                    value=ecd(i.partition(':')[2].strip())
+                    if key.lower() =='cookie':
+                        dict1=str_to_cookie(value)
+                        dict1= {'<span style="color:#4682B4 ">%s</span>' % key:dict1[key] for key, value in dict1.items()}
+                        value=cookie_to_str(dict1)
+                    temp.append('<span style="color:#00A000">%s</span>' % key + ': ' + value)
+                self.setText(
+                    ecd(req.partition(headers)[0]).replace('\n', '<br>') + '<br>'.join(temp) + req.partition(headers)[
+                        2].replace('\n', '<br>'))
+        elif 'header' in self.objectName():
+            try:
+                list1 = self.parent().parent().onlyCookies.text().partition('筛选请求头:')[2]  # 失焦触发
+            except:
+                list1 = self.parent().onlyCookies.text().partition('筛选请求头:')[2]  # self.header1.setColor() 初次
+            list1 = list1.split(',')
+            list1 = list(filter(lambda x: x.strip() != '', list1))  # 去空
+            list1 = [i.lower() for i in list1]  # 小写
+            list1 = list(set(list1))  # 去重
+            temp = []
+            for i in self.toPlainText().strip().split('\n'):
+                if i:
+                    key = ecd(i.partition(':')[0])
+                    value = ecd(i.partition(':')[2].strip())
+                    if key.lower() =='cookie':
+                        dict1=str_to_cookie(value)
+                        dict1= {'<span style="color:#4682B4 ">%s</span>' % key:dict1[key] for key, value in dict1.items()}
+                        value=cookie_to_str(dict1)
+                    if list1 != []:
+                        if key.lower() in list1:
+                            temp.append('<span style="color:#00A000">%s</span>' % key + ': ' + value)
+                    else:
+                        temp.append('<span style="color:#00A000">%s</span>' % key + ': ' + value)
+            self.setText('<br>'.join(temp))
+        else:
+            temp = []
+            for i in self.toPlainText().strip().split('\n'):
+                if i:
+                    temp.append('<span style="color:#00A000">%s</span>' % ecd(i.partition(':')[0]) + ': ' + ecd(
+                        i.partition(':')[2].strip()))
+            self.setText('<br>'.join(temp))
