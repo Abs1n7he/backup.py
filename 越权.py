@@ -22,7 +22,13 @@ class MyQTextEdit(QTextEdit):
         super(MyQTextEdit, self).__init__(parent)
 
     def setColor(self):
-        if self.objectName() == 'request':  # self.request.setObjectName('request') 区分上色手法
+        if self.objectName().startswith('zhushi'):
+            txt=self.toPlainText()
+            if '#' in txt:
+                self.setText(txt.partition('#')[0] + '<span style="color:#A5A5A5">#%s</span>' % txt.partition('#')[2])
+            else:
+                self.setText('<span style="color:#000000">%s</span>' % txt)
+        elif self.objectName() == 'request':  # self.request.setObjectName('request') 区分上色手法
             req = self.toPlainText()
             headers = req.partition('\n')[2].partition('\n\n')[0].strip()
             if req and headers:
@@ -35,9 +41,7 @@ class MyQTextEdit(QTextEdit):
                         dict1= {'<span style="color:#4682B4 ">%s</span>' % key:dict1[key] for key, value in dict1.items()}
                         value=cookie_to_str(dict1)
                     temp.append('<span style="color:#00A000">%s</span>' % key + ': ' + value)
-                self.setText(
-                    ecd(req.partition(headers)[0]).replace('\n', '<br>') + '<br>'.join(temp) + req.partition(headers)[
-                        2].replace('\n', '<br>'))
+                self.setText(ecd(req.partition(headers)[0]).replace('\n', '<br>') + '<br>'.join(temp) + req.partition(headers)[2].replace('\n', '<br>'))
         elif 'header' in self.objectName():
             try:
                 list1 = self.parent().parent().onlyCookies.text().partition('筛选请求头:')[2]  # 失焦触发
@@ -95,7 +99,7 @@ class Example(QMainWindow):
                         'delete_req_header=Cookie,X-Csrf_Token,Referer\n\n' +
                         '#检查响应头\n' +
                         'cherk_res_header={' +
-                        '"x-frame-options":"(sameorin)|(deny)",' +
+                        '"x-frame-options":"(SAMEORIGIN)|(DENY)",' +
                         '"x-content-type-options":"nosniff",' +
                         '"x-xss-protection":"1;mode=block",' +
                         '"strict-transport-security":"",' +
@@ -157,10 +161,6 @@ class Example(QMainWindow):
         # elif action.objectName() == 'setCookie':
         #     self.SetCookieSwitch = value
 
-
-
-
-
     ############### 修改配置文件中日志的值 ##############
     def updateConfigFile(self,key,value):
         with open(self.configFile, 'r', encoding='utf-8') as f:
@@ -176,8 +176,7 @@ class Example(QMainWindow):
             f.close()
     def saveConfig_windows(self):  # 保存配置窗口
         self.new_window = QWidget()
-        self.new_window.resize(int(app.desktop().screenGeometry(0).width() * 0.3),
-                               int(app.desktop().screenGeometry(0).height() * 0.3))
+        self.new_window.resize(int(app.desktop().screenGeometry(0).width() * 0.3),int(app.desktop().screenGeometry(0).height() * 0.3))
         self.new_window.setWindowTitle('保存配置')
         grid1 = QGridLayout(self)
 
@@ -316,12 +315,10 @@ class Example(QMainWindow):
         grid.addWidget(self.headerTxt5, 5, 0)
         grid.addWidget(self.headerTxt6, 6, 0, 2, 1)
 
-
         ############## 2 ##############
         self.onlyCookies = QLineEdit(self)
         self.onlyCookies.setPlaceholderText('筛选请求头')
-        self.onlyCookies.editingFinished.connect(
-            lambda: self.onlyCookiesEditingFinished())  # self.onlyCookies 失焦时，处理全部header
+        self.onlyCookies.editingFinished.connect(lambda: self.onlyCookiesEditingFinished())  # self.onlyCookies 失焦时，处理全部header
         self.header1 = MyQTextEdit(self)  # 失焦
         self.header2 = MyQTextEdit(self)
         self.header3 = MyQTextEdit(self)
@@ -364,7 +361,8 @@ class Example(QMainWindow):
         self.request.setObjectName('request')
         self.request.setPlaceholderText("request")
         self.delete_header_button = QCheckBox("删除指定请求头", self)
-        self.delete_req_header = QTextEdit(self)
+        self.delete_req_header = MyQTextEdit(self)
+        self.delete_req_header.setObjectName('zhushi')
         grid.addWidget(self.proxy, 0, 3)
         grid.addWidget(self.request, 1, 3, 5, 1)
         grid.addWidget(self.delete_header_button, 6, 3)
@@ -373,6 +371,7 @@ class Example(QMainWindow):
         ############## 5 ##############
         self.response = QTextEdit(self)
         self.response.setPlaceholderText("response")
+        self.response.setReadOnly(True)
         self.check_res_header_button = QCheckBox("检查响应头", self)
         self.check_res_header_button.setChecked(True)
         self.check_res_header = MyQTextEdit(self)  # 失焦
@@ -413,6 +412,7 @@ class Example(QMainWindow):
         self.header6.setColor()
         self.check_res_header.setColor()
         self.request.setColor()
+        self.delete_req_header.setColor()
 
         ############## 不接受用户的富文本插入 ##############
         self.header1.setAcceptRichText(False)
@@ -439,7 +439,6 @@ class Example(QMainWindow):
         self.header5.setColor()
         self.header6.setColor()
 
-
     def runReq(self, textEdit):
         self.response.clear()
         header = textEdit.toPlainText()
@@ -460,6 +459,7 @@ class Example(QMainWindow):
             self.status.showMessage('Error 请求失败,检查method,path,host', 5000)
             return
 
+        bakheaders = headers.copy()
         ############## 替换header ##############
         if header.strip() != '':
             jsonHeader = str_to_json(header)        # header 来自替换
@@ -468,13 +468,12 @@ class Example(QMainWindow):
         else:
             jsonHeader={}
 
-
         ############## 删除指定请求头 ##############
         if self.delete_header_button.isChecked():
-            delete = self.delete_req_header.toPlainText().split(',')  # 取值
+            delete = self.delete_req_header.toPlainText().partition('#')[0].split(',')  # 取值
             delete = [i.lower() for i in delete]  # 小写
             delete = list(filter(lambda x: x.strip() != '', delete))  # 去空
-            delete = set(delete)  # 去重
+            delete = list(set(delete))  # 去重
             doDelete = []
             for key in headers.keys():
                 if key.lower() in delete:
@@ -482,7 +481,6 @@ class Example(QMainWindow):
             for key in doDelete:
                 headers.pop(key)
         self.status.showMessage('Loading...', 5000)
-
 
         ############## 发送请求 ##############
         res = GetResponse(method, url, headers, isjson, body, proxies)
@@ -494,13 +492,6 @@ class Example(QMainWindow):
         dict_res_header = dict(res.headers)
         reason=res.reason
         body=res.text
-
-        def get_set_cookie(res_header):  # dict(res.headers)
-            SetCookie = re.split(r',\s*(?=[^;]+=)', res_header['Set-Cookie'])
-            list1 = [i.partition(';')[0] for i in SetCookie]
-            set_cookie = str_to_cookie(';'.join(list1))
-            return set_cookie
-
 
         ############## 更新token ##############
         if status == 400 and '"code":400,"error":"Bad Request"' in body:
@@ -545,7 +536,7 @@ class Example(QMainWindow):
                           '<br>' + req_2.replace('\n', '<br>') + "</p><br>")
                 log.write('<p>[response:]<br>' + str(status) + " " + reason + "<br>" +
                           ''.join([k + ':' + v + '<br>' for k, v in dict_res_header.items()]) + "<br><span>" +
-                          ecd(body).encode("utf-8").decode("unicode_escape") + "</span></p></div></details>")
+                          ecd(body).encode("utf-8").decode() + "</span></p></div></details>")
                 log.close()
 
         ############## 检查响应头 ##############
@@ -553,8 +544,7 @@ class Example(QMainWindow):
         lack_res_header = []  # 缺失响应头
         if self.check_res_header_button.isChecked():
             dict_check_res_header = str_to_json(self.check_res_header.toPlainText())
-            dict_res_header2 = {key.lower(): dict_res_header[key].replace(' ', '').lower() for key, value in
-                                dict_res_header.items()}
+            dict_res_header2 = {key.lower(): dict_res_header[key].replace(' ', '').lower() for key, value in dict_res_header.items()}
             dict_res_header3 = {key.lower(): dict_res_header[key] for key, value in dict_res_header.items()}
             for key, value in dict_check_res_header.items():
                 try:
@@ -587,18 +577,20 @@ class Example(QMainWindow):
 
         ############## 输出响应体 ##############
         if self.action_printHtml.isChecked():
-            self.response.append('<span style="color:#000000">%s</span><br>' % json_or_xml_body(res.headers, res.text.strip()).replace('\n', '<br>'))
+            self.response.append('<span style="color:#000000">%s</span><br>' % json_or_xml_body(res.headers, res.text.strip()).replace('\n', '<br>').replace(' ', '&nbsp;'))
         else:
-            self.response.append('<span style="color:#000000">%s</span><br>' % ecd(json_or_xml_body(res.headers, res.text.strip())).replace('\n', '<br>'))
+            self.response.append('<span style="color:#000000">%s</span><br>' % ecd(json_or_xml_body(res.headers, res.text.strip())).replace('\n', '<br>').replace(' ', '&nbsp;'))
         self.status.showMessage('Success 请求成功', 5000)
 
         ############## Set-Cookie ##############
         if self.action_SetCookie.isChecked():
-            if 'Cookie' not in self.onlyCookies.text():
-                self.onlyCookies.setText(self.onlyCookies.text()+',Cookie')
-            if 'Set-Cookie' in dict_res_header.keys():
+            if 'Set-Cookie' in dict_res_header.keys():      # Set-Cookie 在响应头中
+                if 'Cookie' not in self.onlyCookies.text():
+                    self.onlyCookies.setText(self.onlyCookies.text() + ',Cookie')
                 set_cookie=get_set_cookie(dict_res_header)
-                print(set_cookie)
+                print(set_cookie.keys())
+                if 'Cookie' in bakheaders.keys() and 'Cookie' not in jsonHeader.keys():
+                    jsonHeader={**{'Cookie':bakheaders['Cookie']},**jsonHeader}
                 for key, value in set_cookie.items():
                     jsonHeader=updateCookie(jsonHeader, key, value)
                 textEdit.setText(json_to_str(jsonHeader))
