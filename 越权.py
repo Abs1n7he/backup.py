@@ -32,6 +32,7 @@ class MyQTextEdit(QTextEdit):
             req = self.toPlainText()
             headers = req.partition('\n')[2].partition('\n\n')[0].strip()
             if req and headers:
+                body=req.partition(headers)[2].strip()
                 temp = []
                 for i in headers.split('\n'):
                     key=ecd(i.partition(':')[0])
@@ -41,7 +42,21 @@ class MyQTextEdit(QTextEdit):
                         dict1= {'<span style="color:#4682B4 ">%s</span>' % key:dict1[key] for key, value in dict1.items()}
                         value=cookie_to_str(dict1)
                     temp.append('<span style="color:#00A000">%s</span>' % key + ': ' + value)
-                self.setText(ecd(req.partition(headers)[0]).replace('\n', '<br>') + '<br>'.join(temp) + req.partition(headers)[2].replace('\n', '<br>'))
+                self.setText(ecd(req.partition(headers)[0]).replace('\n', '<br>') + '<br>'.join(temp) + '<br>')
+
+                tempheaders=str_to_json(headers)
+                if 'Content-Type' in tempheaders and 'json' in tempheaders['Content-Type']:
+                    jsonBody = str(''.join([i.strip() for i in body.strip('\n')]))
+                    self.append(ecd(json_or_xml_body({"Content-Type":'json'},jsonBody)).replace('\n','<br>').replace(' ','&nbsp;'))
+                else:
+                    self.append(ecd(body).replace('\n', '<br>'))
+                # if 'json' in str_to_json(headers)['Content-Type'] and body.startswith('{'):
+                #     print(1)
+                #
+                #     self.setText(ecd(req.partition(headers)[0]).replace('\n', '<br>') + '<br>'.join(temp) +'<br><br>'+
+                #                  )
+                # else:
+                #     self.setText(ecd(req.partition(headers)[0]).replace('\n', '<br>') + '<br>'.join(temp) +'<br><br>'+  ecd(body).replace('\n', '<br>'))
         elif 'header' in self.objectName():
             try:
                 list1 = self.parent().parent().onlyCookies.text().partition('筛选请求头:')[2]  # 失焦触发
@@ -440,7 +455,7 @@ class Example(QMainWindow):
         self.header6.setColor()
 
     def runReq(self, textEdit):
-        self.response.clear()
+        self.response.setText('')
         header = textEdit.toPlainText()
         ############## 设置代理 ##############
         if self.proxy_button.isChecked():
@@ -583,10 +598,11 @@ class Example(QMainWindow):
         self.status.showMessage('Success 请求成功', 5000)
 
         ############## Set-Cookie ##############
-        if self.action_SetCookie.isChecked():
+        if self.action_SetCookie.isChecked() and status<400:
             if 'Set-Cookie' in dict_res_header.keys():      # Set-Cookie 在响应头中
                 if 'Cookie' not in self.onlyCookies.text():
                     self.onlyCookies.setText(self.onlyCookies.text() + ',Cookie')
+                print(1)
                 set_cookie=get_set_cookie(dict_res_header)
                 print(set_cookie.keys())
                 if 'Cookie' in bakheaders.keys() and 'Cookie' not in jsonHeader.keys():
