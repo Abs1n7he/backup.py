@@ -1,4 +1,5 @@
 import ast
+import inspect
 import json
 import re
 import sys
@@ -15,7 +16,7 @@ def json_or_xml_body(headers,body):
         if 'Content-Type' in headers.keys():
             if 'json' in headers['Content-Type']:
                 return json.dumps(json.loads(body), indent=1, ensure_ascii=False, sort_keys=False,separators=(',', ':'))
-            elif 'xml' in headers['Content-Type'] and body.startswith('<'):
+            elif 'xml' in headers['Content-Type']:
                 return printXML(body).replace('ns0:','')
             else:
                 return '\n'+body
@@ -101,9 +102,17 @@ def GetResponse(method,url,headers,isjson,body,proxies):
 
 def get_set_cookie(res_header):  # dict(res.headers)
     SetCookie = re.split(r',\s*(?=[^;]+=)', res_header['Set-Cookie'])
-    print(SetCookie)
-    list1 = [i.partition(';')[0] for i in SetCookie]
-    print(list1)
-    set_cookie = str_to_cookie(';'.join(list1))
-    print(set_cookie)
-    return set_cookie
+    # list1 = [i.partition(';')[0] for i in SetCookie]
+    # set_cookie = str_to_cookie(';'.join(list1))
+
+    return [[i.partition(';')[0].partition('=')[0].strip(),i.partition(';')[0].partition('=')[2].strip(),i.partition(';')[2].strip()] for i in SetCookie]
+
+
+
+################ PYQT5 ################
+def show_popup(title,txt):
+    popup = QMessageBox()
+    popup.setWindowTitle(title)
+    popup.setText(txt)
+    popup.setIcon(QMessageBox.Information)
+    popup.exec_()

@@ -1,21 +1,28 @@
 import sys
 import re
 import os
+import ast
 import json
 import time
 import glob
-import ast
-import requests
+import yaml
 import base64
+import requests
 import urllib3
 urllib3.disable_warnings()
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from my_requests import *
 
+
 # green   #00A000
 # red     #DC143C
 # orange  #FF8C00
+
+ToolName='黑盒越权测试工具'
+Version='V1.1.0'
+Author='Abs1nThe'
+
 ################ 自定义QTextEdit + 失焦 ################
 class MyQTextEdit(QTextEdit):
     def __init__(self, parent=None):
@@ -23,12 +30,16 @@ class MyQTextEdit(QTextEdit):
 
     def setColor(self):
         if self.objectName().startswith('zhushi'):
-            txt=self.toPlainText()
-            if '#' in txt:
-                self.setText(txt.partition('#')[0] + '<span style="color:#A5A5A5">#%s</span>' % txt.partition('#')[2])
-            else:
-                self.setText('<span style="color:#000000">%s</span>' % txt)
-        elif self.objectName() == 'request':  # self.request.setObjectName('request') 区分上色手法
+            txt=self.toPlainText().strip().split('\n')
+            output=[]
+            for i in txt:
+                if '#' in i:
+                    output.append(f'{i.partition('#')[0]}<span style="color:#A5A5A5">#{i.partition('#')[2]}</span>')
+ 
+                else:
+                    output.append(f'<span style="color:#000000">{i}</span>')
+            self.setText('<br>'.join(output))
+        elif self.objectName() == 'request':
             req = self.toPlainText()
             headers = req.partition('\n')[2].partition('\n\n')[0].strip()
             if req and headers:
@@ -41,28 +52,23 @@ class MyQTextEdit(QTextEdit):
                         dict1=str_to_cookie(value)
                         dict1= {'<span style="color:#4682B4 ">%s</span>' % key:dict1[key] for key, value in dict1.items()}
                         value=cookie_to_str(dict1)
-                    temp.append('<span style="color:#00A000">%s</span>' % key + ': ' + value)
+                    temp.append(f'<span style="color:#00A000">{key}</span>: {value}')
                 self.setText(ecd(req.partition(headers)[0]).replace('\n', '<br>') + '<br>'.join(temp) + '<br>')
-
                 tempheaders=str_to_json(headers)
                 if 'Content-Type' in tempheaders and 'json' in tempheaders['Content-Type']:
-                    jsonBody = str(''.join([i.strip() for i in body.strip('\n')]))
-                    self.append(ecd(json_or_xml_body({"Content-Type":'json'},jsonBody)).replace('\n','<br>').replace(' ','&nbsp;'))
+                    try:
+                        jsonBody = str(''.join([i.strip() for i in body.strip('\n')]))
+                        self.append(ecd(json_or_xml_body({"Content-Type":'json'},jsonBody)).replace('\n','<br>').replace(' ','&nbsp;'))
+                    except:
+                        self.append(ecd(body).replace('\n', '<br>'))
                 else:
                     self.append(ecd(body).replace('\n', '<br>'))
-                # if 'json' in str_to_json(headers)['Content-Type'] and body.startswith('{'):
-                #     print(1)
-                #
-                #     self.setText(ecd(req.partition(headers)[0]).replace('\n', '<br>') + '<br>'.join(temp) +'<br><br>'+
-                #                  )
-                # else:
-                #     self.setText(ecd(req.partition(headers)[0]).replace('\n', '<br>') + '<br>'.join(temp) +'<br><br>'+  ecd(body).replace('\n', '<br>'))
         elif 'header' in self.objectName():
             try:
                 list1 = self.parent().parent().onlyCookies.text().partition('筛选请求头:')[2]  # 失焦触发
             except:
                 list1 = self.parent().onlyCookies.text().partition('筛选请求头:')[2]  # self.header1.setColor() 初次
-            list1 = list1.split(',')
+            list1 = re.split('[,.;，。；、]',list1)
             list1 = list(filter(lambda x: x.strip() != '', list1))  # 去空
             list1 = [i.lower() for i in list1]  # 小写
             list1 = list(set(list1))  # 去重
@@ -77,16 +83,15 @@ class MyQTextEdit(QTextEdit):
                         value=cookie_to_str(dict1)
                     if list1 != []:
                         if key.lower() in list1:
-                            temp.append('<span style="color:#00A000">%s</span>' % key + ': ' + value)
+                            temp.append(f'<span style="color:#00A000">{key}</span>: {value}')
                     else:
-                        temp.append('<span style="color:#00A000">%s</span>' % key + ': ' + value)
+                        temp.append(f'<span style="color:#00A000">{key}</span>: {value}')
             self.setText('<br>'.join(temp))
         else:
             temp = []
             for i in self.toPlainText().strip().split('\n'):
                 if i:
-                    temp.append('<span style="color:#00A000">%s</span>' % ecd(i.partition(':')[0]) + ': ' + ecd(
-                        i.partition(':')[2].strip()))
+                    temp.append(f'<span style="color:#00A000">{ecd(i.partition(':')[0])}</span>: {ecd(i.partition(':')[2].strip())}')
             self.setText('<br>'.join(temp))
 
     def focusOutEvent(self, event):  # 失焦
@@ -98,22 +103,23 @@ class Example(QMainWindow):
     def __init__(self):
         super().__init__()
         ############## 获取配置文件，初始化配置文件 ##############
-        self.configFile = 'BlackBox.config'
-        self.logFile = time.strftime("%Y%m%d.html", time.localtime(time.time()))
+        self.configFile = './config/config.yaml'
+        if not os.path.isdir('./config'):
+            os.mkdir('./config')
         if not os.path.isfile(self.configFile):
             with open(self.configFile, 'w', encoding='utf-8') as f:
-                f.write('#日志记录\nLog=True\n\n' +
-                        '#http代理\nproxy=http://127.0.0.1:8080\n\n' +
-                        '#筛选请求头\nonlyCookies=筛选请求头:Cookie,X-Csrf_Token\n\n' +
-                        '#用户header 请求头1,请求头2,请求头3,请求头4,请求头5,请求头6\n' +
-                        'header5={"Referer":"baidu.com","origin":""}\n' +
-                        'header6={"Cookie":"","X-Csrf_Token":""}\n\n' +
+                f.write('#日志记录\nLog: true\n\n' +
+                        '#http代理\nproxy: "http://127.0.0.1:8080"\n\n' +
+                        '#筛选请求头\nonlyCookies: "筛选请求头:Cookie,X-Csrf_Token"\n\n' +
+                        'header: ["请求头1","请求头2","请求头3","请求头4","请求头5","请求头6"]\n' +
+                        'header5: {"Referer":"baidu.com","origin":""}\n' +
+                        'header6: {"Cookie":"","X-Csrf_Token":""}\n\n' +
                         '#请求\n' +
-                        'request=\n\n' +
+                        'request: ""\n\n' +
                         '#删除指定请求头\n' +
-                        'delete_req_header=Cookie,X-Csrf_Token,Referer\n\n' +
+                        'delete_req_header: "Cookie,X-Csrf_Token,Referer"\n\n' +
                         '#检查响应头\n' +
-                        'cherk_res_header={' +
+                        'cherk_res_header: {' +
                         '"x-frame-options":"(SAMEORIGIN)|(DENY)",' +
                         '"x-content-type-options":"nosniff",' +
                         '"x-xss-protection":"1;mode=block",' +
@@ -123,8 +129,8 @@ class Example(QMainWindow):
                         '"access-control-allow-credentials":"true"}')
                 f.close()
 
-        ############## 读取配置 ##############
-        self.LogSwitch = 'False'
+        ############## 读取基本配置 ##############
+        self.LogSwitch = False
         self.proxy1 = 'http://127.0.0.1:8080'
         self.onlyCookies1='筛选请求头:'
         self.listHeader=['请求头1','请求头2','请求头3','请求头4','请求头5','请求头6']
@@ -132,36 +138,49 @@ class Example(QMainWindow):
         self.request1=''
         self.delete_req_header1=''
         self.check_res_header1=''
-
         with open(self.configFile, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.startswith('Log'):
-                    self.LogSwitch = line.partition('=')[2].strip()
-                elif line.startswith('proxy'):
-                    self.proxy1 = line.partition('=')[2].strip()
-                elif line.startswith('onlyCookies'):
-                    self.onlyCookies1 = line.partition('=')[2].strip()
-                elif line.startswith('#用户header'):
-                    temp=line.partition('#用户header')[2].strip().split(',')
-                    for i in range(6):
-                        if temp[i].strip()!='':
-                            self.listHeader[i]=temp[i].strip()
-                elif line.startswith('header'):
-                    self.headers[int(line[6])-1] = line.partition('=')[2].replace('\'', '"').strip()
-                elif line.startswith('delete_req_header'):
-                    self.delete_req_header1 = line.partition('=')[2].strip()
-                elif line.startswith('cherk_res_header'):
-                    self.check_res_header1 = line.partition('=')[2].replace('\'', '"').strip()
-                elif line.startswith('request'):
-                    self.request1 = line.partition('=')[2].strip()
+            config=yaml.load(f,yaml.Loader)
             f.close()
+        if 'Log' in config.keys():
+            self.LogSwitch = config['Log']
+        if 'proxy' in config.keys():
+            self.proxy1 = config['proxy']
+        if 'onlyCookies' in config.keys():
+            self.onlyCookies1 = config['onlyCookies']
+        if 'header' in config.keys():
+            self.listHeader = config['header']
+        if 'header1' in config.keys():
+            self.headers[0] = config['header1']
+        if 'header2' in config.keys():
+            self.headers[1] = config['header2']
+        if 'header3' in config.keys():
+            self.headers[2] = config['header3']
+        if 'header4' in config.keys():
+            self.headers[3] = config['header4']
+        if 'header5' in config.keys():
+            self.headers[4] = config['header5']
+        if 'header6' in config.keys():
+            self.headers[5] = config['header6']
+        if 'delete_req_header' in config.keys():
+            self.delete_req_header1 = config['delete_req_header']
+        if 'cherk_res_header' in config.keys():
+            self.check_res_header1 = config['cherk_res_header']
+        if 'request' in config.keys():
+            self.request1 = config['request']
+
+        ############## 读取模式配置 ##############
+        try:
+            with open('./config/model.yaml', 'r', encoding='utf-8') as f:
+            self.model=yaml.load(f,yaml.Loader)
+            f.close()
+        except:pass
 
         self.initUI()
         self.menu()
         self.show()
         ############## 状态栏显示 ##############
         self.status = self.statusBar()
-        self.status.showMessage('越权测试 Bate 1.0   By:Abs1nThe', 5000)  # 状态栏显示 文本 5秒
+        self.status.showMessage(f'{ToolName} {Version}   By:{Author}', 5000)  # 状态栏显示 文本 5秒
 
     def update_check_state(self, action):
         if action.isChecked():
@@ -172,24 +191,10 @@ class Example(QMainWindow):
             value = 'False'
         if action.objectName() == 'log':
             self.LogSwitch = value
-        #     self.updateConfigFile('Log=',value)
-        # elif action.objectName() == 'setCookie':
-        #     self.SetCookieSwitch = value
 
-    ############### 修改配置文件中日志的值 ##############
-    def updateConfigFile(self,key,value):
-        with open(self.configFile, 'r', encoding='utf-8') as f:
-            temp=[]
-            for line in f:
-                if line.startswith(key):
-                    temp.append(key+value+'\n')
-                else:
-                    temp.append(line)
-            f.close()
-        with open(self.configFile, 'w', encoding='utf-8') as f:
-            f.writelines(temp)
-            f.close()
-    def saveConfig_windows(self):  # 保存配置窗口
+
+    ############## 保存窗口 ##############
+    def saveConfig_windows(self):  
         self.new_window = QWidget()
         self.new_window.resize(int(app.desktop().screenGeometry(0).width() * 0.3),int(app.desktop().screenGeometry(0).height() * 0.3))
         self.new_window.setWindowTitle('保存配置')
@@ -207,7 +212,7 @@ class Example(QMainWindow):
         self.save_req = QCheckBox("request", self)
         self.save_req_header = QCheckBox("删除请求头", self)
         self.save_res_header = QCheckBox("检查响应头", self)
-        self.selectAll_btn = QPushButton("全选", clicked=lambda: self.selectAll())
+        self.selectAll_btn = QPushButton("全选", clicked=lambda: self.selectAll(self.new_window))
         self.saveConfig_btn = QPushButton("保存", clicked=lambda: self.saveConfig())
 
         grid1.addWidget(self.save_header1, 0, 0)
@@ -229,39 +234,28 @@ class Example(QMainWindow):
         self.new_window.show()
 
 
-    def selectAll(self):
-        for checkbox in self.new_window.findChildren(QCheckBox):  # self.new_window中全部的QCheckBox
+    def selectAll(self,action):
+        for checkbox in action.findChildren(QCheckBox):  # self.new_window中全部的QCheckBox
             checkbox.setChecked(True)
 
     def saveConfig(self):
-        maxnum = 0
-        for i in glob.glob("BlackBox.config.bak*"):
-            maxnum = int(re.findall(re.compile(r'BlackBox.config.bak(\d*)', re.S), i)[0])
-        os.rename(self.configFile, "BlackBox.config.bak%d" % (maxnum + 1))  # 旧配置重命名
-        with open(self.configFile, 'w', encoding='utf-8') as f:  # 写入新配置文件
-            for key, value in {
-                'save_log':['self.LogSwitch','\nLog','#日志记录'],
-                'save_proxy': ['self.proxy.text()', '\nproxy', '\n\n#http代理'],
-                'save_onlyCookies': ['self.onlyCookies.text()', '\nonlyCookies', '\n\n#筛选请求头'],
-                '': ['', '', '\n\n#用户header '+self.headerTxt1.text().replace(',','')+','+self.headerTxt2.text().replace(',','')+','+self.headerTxt3.text().replace(',','')+','+self.headerTxt4.text().replace(',','')+','+self.headerTxt5.text().replace(',','')+','+self.headerTxt6.text().replace(',','')],
-                'save_header1': ['str_to_json(self.header1.toPlainText())', '\nheader1'],
-                'save_header2': ['str_to_json(self.header2.toPlainText())', '\nheader2'],
-                'save_header3': ['str_to_json(self.header3.toPlainText())', '\nheader3'],
-                'save_header4': ['str_to_json(self.header4.toPlainText())', '\nheader4'],
-                'save_header5': ['str_to_json(self.header5.toPlainText())', '\nheader5'],
-                'save_header6': ['str_to_json(self.header6.toPlainText())', '\nheader6'],
-                'save_req': [r'self.request.toPlainText().replace("\n","\\n")', '\nrequest', '\n\n#请求'],
-                'save_req_header': ['self.delete_req_header.toPlainText()', '\ndelete_req_header','\n\n#删除指定请求头'],
-                'save_res_header': ['str_to_json(self.check_res_header.toPlainText())', '\ncherk_res_header','\n\n#检查响应头']
-            }.items():
-                if not key:  # 空值，只输出value[2]
-                    f.write(value[2])
-                elif eval('self.' + key + '.isChecked()'):
-                    try:
-                        f.write(value[2])
-                    except:
-                        pass
-                    f.write(value[1] + '=' + str(eval(value[0])))
+        data={
+        'Log': self.LogSwitch,
+        'proxy': self.proxy.text(),
+        'onlyCookies': self.onlyCookies.text(),
+        'header': [self.headerTxt1.text(),self.headerTxt2.text(),self.headerTxt3.text(),self.headerTxt4.text(),self.headerTxt5.text(),self.headerTxt6.text()],
+        'header1': str_to_json(self.header1.toPlainText()),
+        'header2': str_to_json(self.header2.toPlainText()),
+        'header3': str_to_json(self.header3.toPlainText()),
+        'header4': str_to_json(self.header4.toPlainText()),
+        'header5': str_to_json(self.header5.toPlainText()),
+        'header6': str_to_json(self.header6.toPlainText()),
+        'request': self.request.toPlainText().replace("\n","\\n"),
+        'delete_req_header':self.delete_req_header.toPlainText(),
+        'cherk_res_header':str_to_json(self.cherk_res_header.toPlainText())
+        }
+        with open(self.configFile,'w',encoding='utf-8') as f:
+            yaml.dump(data,f,allow_unicode=True)
             f.close()
         self.new_window.close()  # 关闭窗口
 
@@ -278,7 +272,7 @@ class Example(QMainWindow):
 
         action_log = QAction('记录日志', self, checkable=True)
         action_log.setObjectName('log')
-        if self.LogSwitch == 'True':
+        if self.LogSwitch == True:
             action_log.setChecked(True)
         action_log.triggered.connect(lambda: self.update_check_state(action_log))
         file.addAction(action_log)
@@ -290,7 +284,7 @@ class Example(QMainWindow):
         self.action_SetCookie.triggered.connect(lambda: self.update_check_state(self.action_SetCookie))
         file.addAction(self.action_SetCookie)
 
-        self.action_printHtml = QAction('响应解析html', self, checkable=True)
+        self.action_printHtml = QAction('响应解析富文本', self, checkable=True)
         # self.action_printHtml.setObjectName('printHtml')
         self.action_printHtml.setChecked(False)
         self.action_printHtml.triggered.connect(lambda: self.update_check_state(self.action_printHtml))
@@ -299,7 +293,7 @@ class Example(QMainWindow):
 
 
     def initUI(self):
-        self.setWindowTitle('越权测试 Bate 1.0   By:Abs1nThe')
+        self.setWindowTitle(f'{ToolName} {Version}   By:{Author}')
         self.resize(int(app.desktop().screenGeometry(0).width() * 0.9),
                     int(app.desktop().screenGeometry(0).height() * 0.8))
 
@@ -384,12 +378,18 @@ class Example(QMainWindow):
         grid.addWidget(self.delete_req_header, 7, 3)
 
         ############## 5 ##############
+        self.Patterns = QComboBox(self)
+        try:
+            self.Patterns.addItems([i['model'] for i in self.model])
+        except:pass
+        self.Patterns.currentIndexChanged.connect(lambda: self.model(self.Patterns.currentText()))
         self.response = QTextEdit(self)
         self.response.setPlaceholderText("response")
         self.response.setReadOnly(True)
         self.check_res_header_button = QCheckBox("检查响应头", self)
         self.check_res_header_button.setChecked(True)
         self.check_res_header = MyQTextEdit(self)  # 失焦
+        grid.addWidget(self.Patterns, 0, 4)
         grid.addWidget(self.response, 1, 4, 5, 1)
         grid.addWidget(self.check_res_header_button, 6, 4)
         grid.addWidget(self.check_res_header, 7, 4)
@@ -406,15 +406,16 @@ class Example(QMainWindow):
         try:
             for i in range(6):
                 if self.headers[i] !='':
-                    eval('self.header'+str(i+1)+'.setText(ecd(json_to_str(ast.literal_eval(self.headers['+str(i)+']))))')
+                    eval('self.header'+str(i+1)+'.setText(ecd(json_to_str(self.headers['+str(i)+'])))')
                 eval('self.headerTxt'+str(i+1)+'.setText(self.listHeader['+str(i)+'].strip())')
             self.proxy.setText(self.proxy1.strip())
             self.onlyCookies.setText(self.onlyCookies1.strip())
             self.request.setText(ecd(self.request1.replace("\\n", "\n")))
             self.delete_req_header.setText(ecd(self.delete_req_header1.strip()))
-            self.check_res_header.setText(ecd(json_to_str(json.loads(self.check_res_header1)).strip()))
+            self.check_res_header.setText(ecd(json_to_str(self.check_res_header1)))
         except:
-            self.response.setText('config文件不规范')
+            show_popup('Error', 'config文件不规范')
+            
 
 
 
@@ -446,6 +447,14 @@ class Example(QMainWindow):
         mainwidget.setLayout(grid)
         self.setCentralWidget(mainwidget)
 
+    def mode(self,txt):
+        try:
+            for i in self.model:
+                if i['model']==txt:
+                    self.onlyCookies.setText(i['onlyCookies'])
+                    break
+        except:pass
+
     def onlyCookiesEditingFinished(self):
         self.header1.setColor()
         self.header2.setColor()
@@ -455,7 +464,8 @@ class Example(QMainWindow):
         self.header6.setColor()
 
     def runReq(self, textEdit):
-        self.response.setText('')
+        self.logFile = time.strftime("./log/%Y%m%d.html", time.localtime(time.time()))
+        self.response.clear()
         header = textEdit.toPlainText()
         ############## 设置代理 ##############
         if self.proxy_button.isChecked():
@@ -485,7 +495,7 @@ class Example(QMainWindow):
 
         ############## 删除指定请求头 ##############
         if self.delete_header_button.isChecked():
-            delete = self.delete_req_header.toPlainText().partition('#')[0].split(',')  # 取值
+            delete = re.split('[,.;，。；、]',self.delete_req_header.toPlainText().partition('#')[0]) # 取值
             delete = [i.lower() for i in delete]  # 小写
             delete = list(filter(lambda x: x.strip() != '', delete))  # 去空
             delete = list(set(delete))  # 去重
@@ -509,35 +519,48 @@ class Example(QMainWindow):
         body=res.text
 
         ############## 更新token ##############
-        if status == 400 and '"code":400,"error":"Bad Request"' in body:
-            tempUrl = 'http://101.43.68.70:65150/login/verify'
-            tempHeaders = str_to_json('Content-Type: application/x-www-form-urlencoded; charset=UTF-8')
-            tempHeaders = {**{'Cookie': headers['Cookie']}, **tempHeaders}
+        try:
+            txt=self.Patterns.currentText()
+            if '标准' not in txt:
+                for model in self.model:
+                    if model['model']==txt:
+                        n=1
+                        while n in model.keys():
+                            if status == model[n]['status'] and any(i in body for i in model[n]['body']):
+                                with open(model[n]['request'],'r',encoding='utf-8') as f:
+                                    if 'https' in model[n]['request']:
+                                        Tiferror, Tmethod, Tpath, Thost, Turl, Theaders, Tisjson, Tbody = GetRequest('https', f.read())
+                                    else:
+                                        Tiferror, Tmethod, Tpath, Thost, Turl, Theaders, Tisjson, Tbody = GetRequest('http', f.read())
+                                    f.close()
+                                if Tiferror==False:
+                                    print('txt解析错误'+Tmethod)
+                                    return
+                                else:
+                                    Theaders={**{'Cookie':headers['Cookie']},**Theaders}
+                                    Tres=GetResponse(Tmethod,Turl,Theaders,Tisjson,Tbody,proxies)
+                                    if Tres.status_code==model[n]['get_token']['status']:
+                                        # 从响应体获取token
+                                        result = eval(model[n]['get_token']['where'])
+                                        # 更新请求头token
+                                        Ttoken=model[n]['get_token']['value']
+                                        jsonHeader[Ttoken]=result
+                                        if Ttoken not in self.onlyCookies.text():
+                                            self.onlyCookies.setText(f'{self.onlyCookies.text()},{Ttoken}')
+                                        textEdit.setText(json_to_str(jsonHeader))
+                                        textEdit.setColor()
+                                self.response.setText('<span style="color:#00A000">更新 token 成功,重新请求</span>')
+                                return
+                            n+=1
 
-            res1 = GetResponse('post', tempUrl, tempHeaders, False, '', proxies)
-            # # 从响应体获取
-            # result=json.loads(res1.text)['msg']
-            # # 更新Cookie
-            # jsonHeader=updateCookie(jsonHeader,'token',result)
-            # # 更新请求头
-            # jsonHeader['token']=result
-            # if 'token' not in self.onlyCookies.text():
-            #     self.onlyCookies.setText(self.onlyCookies.text()+',token')
-            # # 从Set-Cookie更新Cookie
-            # set_cookie=get_set_cookie(res1.headers)
-            # for key, value in set_cookie.items():
-            #     jsonHeader = updateCookie(jsonHeader, key, value)
-
-            textEdit.setText(json_to_str(jsonHeader))
-            textEdit.setColor()
-            self.response.setText('<span style="color:#00A000">已更新token</span>')
-            self.status.showMessage('已更新token', 5000)
-            return
+        except:pass
 
         ############## 记录日志 ##############
         req_1 = '\n'.join(req.split('\n')[0:2])
         req_2 = req.partition('\n\n')[2]
-        if self.LogSwitch == 'True':
+        if self.LogSwitch == True:
+            if not os.path.isdir('./logs'):
+                os.mkdir('./logs')
             if not os.path.isfile(self.logFile):
                 with open(self.logFile, 'a', encoding='utf-8') as log:
                     log.write('<head><style type="text/css">.div1{margin-left:40px;}</style><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/></head>')
@@ -571,8 +594,6 @@ class Example(QMainWindow):
                         pass
                     elif value.replace(' ', '').lower() != dict_res_header2[key.lower()]:
                         bad_res_header.append(ecd(key.lower()))  # 错误
-                    else:
-                        print('还能有什么情况？', key, value)
                 except:
                     pass
 
@@ -580,14 +601,18 @@ class Example(QMainWindow):
         response_text = str(status) + ' ' + reason + '<br>'
         for key, value in dict_res_header.items():
             if key.lower() in bad_res_header:
-                response_text += '<span style="color:#DC143C">%s: %s</span><br>' % (str(key), str(value))
-            elif key.lower() in ['set-cookie','content-length','server']:
-                response_text += '<span style="color:#FF8C00">%s:</span> %s<br>' % (str(key), str(value))
+                response_text += f'<span style="color:#DC143C">{key}: {str(value)}</span><br>'
+            elif key.lower() in ['content-length','server']:
+                response_text += f'<span style="color:#FF8C00">{key}:</span> {str(value)}<br>'
+            elif key.lower() == 'set-cookie':
+                set_cookie = get_set_cookie(dict_res_header)
+                set_cookie_flag=True
+                for i in set_cookie:
+                    response_text += f'<span style="color:#00A000">{key}:</span> <span style="color:#FF8C00">{str(i[0])}</span>={str(i[1])}; {str(i[2])}<br>'
             else:
-                response_text += '<span style="color:#00A000">%s:</span> %s<br>' % (str(key), str(value))
+                response_text += f'<span style="color:#00A000">{key}:</span> {str(value)}<br>'
         if len(lack_res_header) > 0:
-            response_text += '<span style="color:#DC143C">缺失安全响应头: <br>' + '<br>'.join(
-                lack_res_header) + '</span><br>'
+            response_text += '<span style="color:#DC143C">缺失安全响应头: <br>' + '<br>'.join(lack_res_header) + '</span><br>'
         self.response.setText(response_text)
 
         ############## 输出响应体 ##############
@@ -599,16 +624,15 @@ class Example(QMainWindow):
 
         ############## Set-Cookie ##############
         if self.action_SetCookie.isChecked() and status<400:
-            if 'Set-Cookie' in dict_res_header.keys():      # Set-Cookie 在响应头中
+            if set_cookie_flag==True:
                 if 'Cookie' not in self.onlyCookies.text():
                     self.onlyCookies.setText(self.onlyCookies.text() + ',Cookie')
-                print(1)
-                set_cookie=get_set_cookie(dict_res_header)
-                print(set_cookie.keys())
+                if debug==True:
+                    self.status.showMessage(f"set_cookie:{''.join([i[0] for i in set_cookie])}",5000)
                 if 'Cookie' in bakheaders.keys() and 'Cookie' not in jsonHeader.keys():
                     jsonHeader={**{'Cookie':bakheaders['Cookie']},**jsonHeader}
-                for key, value in set_cookie.items():
-                    jsonHeader=updateCookie(jsonHeader, key, value)
+                for i in set_cookie:
+                    jsonHeader=updateCookie(jsonHeader, i[0], i[1])
                 textEdit.setText(json_to_str(jsonHeader))
                 textEdit.setColor()
 
@@ -616,6 +640,7 @@ class Example(QMainWindow):
 if __name__ == '__main__':
     proxies = {}
     app = QApplication(sys.argv)
+    debug=True
     try:
         with open(glob.glob("*.qss")[0]) as f:
             app.setStyleSheet(f.read())
